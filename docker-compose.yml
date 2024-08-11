@@ -1,0 +1,16 @@
+version: '3.7'
+
+services:
+
+  govm:
+    container_name: govm
+    image: "hyperifyio/govm:dev"
+    restart: unless-stopped
+    build: .
+    environment:
+      LOG_LEVEL: DEBUG
+      PORT: 8080
+#    env_file:
+#    - "./.env"
+    ports:
+    - "8080:8080"

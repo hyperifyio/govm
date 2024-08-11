@@ -1,0 +1,16 @@
+[Unit]
+Description=gmvm Virtual Machine Service
+After=network.target
+
+[Service]
+User=govm
+Group=govm
+ExecStart=/opt/govm/govm
+
+EnvironmentFile=/etc/govm/env
+
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

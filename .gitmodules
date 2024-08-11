@@ -1,0 +1,3 @@
+[submodule "internal/frontend-govm"]
+	path = internal/frontend-govm
+	url = https://github.com/hyperifyio/frontend-govm.git
