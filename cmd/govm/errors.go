@@ -1,4 +1,4 @@
-// Copyright (c) 2024. Heusala Group Ltd <info@hg.fi>. All rights reserved.
+// Copyright (c) 2024. Sendanor <info@sendanor.fi>. All rights reserved.
 
 package main
 
@@ -10,10 +10,12 @@ import (
 // for each! Create another constant for each error.
 
 const (
-	EncodingFailedError = "encoding-failed"
-	BadBodyError        = "bad-body"
-	LimitParseError     = "limit-parse-failed"
-	TypeParseError      = "type-parse-failed"
+	EncodingFailedError          = "encoding-failed"
+	SessionGenerationFailedError = "session-generation-failed"
+	UnauthorizedError            = "unauthorized"
+	BadBodyError                 = "bad-body"
+	LimitParseError              = "limit-parse-failed"
+	TypeParseError               = "type-parse-failed"
 )
 
 func sendHttpError(w http.ResponseWriter, code string, status int) {

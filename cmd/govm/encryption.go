@@ -1,4 +1,4 @@
-// Copyright (c) 2024. Heusala Group Ltd <info@hg.fi>. All rights reserved.
+// Copyright (c) 2024. Sendanor <info@sendanor.fi>. All rights reserved.
 
 package main
 
@@ -7,10 +7,29 @@ import (
 	"crypto/cipher"
 	"crypto/rand"
 	"encoding/base64"
+	"encoding/hex"
 	"io"
 )
 
-// Generate a new AES key.
+// Generate a new auth token
+func generateAuthToken() (string, error) {
+	key := make([]byte, 16) // AES-256
+	if _, err := io.ReadFull(rand.Reader, key); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(key), nil
+}
+
+// Generate a new password
+func generatePassword() (string, error) {
+	key := make([]byte, 16) // AES-256
+	if _, err := io.ReadFull(rand.Reader, key); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(key), nil
+}
+
+// Generate a new AES key
 // In a real application, you'd use a fixed, secure key stored securely.
 func generateKey() ([]byte, error) {
 	key := make([]byte, 32) // AES-256
@@ -71,4 +90,3 @@ func decrypt(ciphertext string, key []byte) (string, error) {
 
 	return string(plaintext), nil
 }
-

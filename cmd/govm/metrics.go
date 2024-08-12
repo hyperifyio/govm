@@ -1,4 +1,4 @@
-// Copyright (c) 2024. Heusala Group Ltd <info@hg.fi>. All rights reserved.
+// Copyright (c) 2024. Sendanor <info@sendanor.fi>. All rights reserved.
 
 package main
 

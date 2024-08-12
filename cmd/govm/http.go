@@ -1,4 +1,4 @@
-// Copyright (c) 2024. Heusala Group Ltd <info@hg.fi>. All rights reserved.
+// Copyright (c) 2024. Sendanor <info@sendanor.fi>. All rights reserved.
 
 package main
 
@@ -10,32 +10,76 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
-	"govm/internal/frontend"
+	frontend "govm/internal"
 )
 
-func handleVirtualServerStateRequest(w http.ResponseWriter, r *http.Request) {
+func handleApiIndexRequest(w http.ResponseWriter, r *http.Request) {
 
 	httpRequestsTotal.WithLabelValues(r.URL.Path).Inc()
 
-	// Initialize an instance of VirtualServerDTO
-	var vmRequest CreateVirtualServerDTO
+	authorization := r.Header.Get("Authorization")
+	isValidSession := authorization == "Bearer "+ServerAdminSessionToken
 
-	// Decode the request body into vmRequest
-	err := json.NewDecoder(r.Body).Decode(&vmRequest)
+	// Set the Content-Type header.
+	w.Header().Set("Content-Type", "application/json")
+
+	var response IndexDTO
+	if isValidSession {
+		response = IndexDTO{
+			Email:           ServerAdminEmail,
+			IsAuthenticated: true,
+		}
+	} else {
+		response = IndexDTO{
+			Email:           "",
+			IsAuthenticated: false,
+		}
+	}
+
+	err := json.NewEncoder(w).Encode(response)
+	if err != nil {
+		log.Printf("handleApiIndexRequest: encoding: error: %v", err)
+		sendHttpError(w, EncodingFailedError, http.StatusInternalServerError)
+		return
+	}
+
+}
+
+func handleApiServerCreateRequest(w http.ResponseWriter, r *http.Request) {
+
+	httpRequestsTotal.WithLabelValues(r.URL.Path).Inc()
+
+	authorization := r.Header.Get("Authorization")
+	isValidSession := authorization == "Bearer "+ServerAdminSessionToken
+
+	if !isValidSession {
+		sendHttpError(w, UnauthorizedError, http.StatusUnauthorized)
+		return
+	}
+
+	// Initialize an instance of VirtualServerDTO
+	var requestBody CreateVirtualServerDTO
+
+	// Decode the request body into requestBody
+	err := json.NewDecoder(r.Body).Decode(&requestBody)
 	if err != nil {
 		sendHttpError(w, BadBodyError, http.StatusBadRequest)
 		return
 	}
 
-	var requestedName string
-	if vmRequest.Name != nil {
-		requestedName = *(vmRequest.Name)
-	} else {
-		requestedName = ""
+	var name string = *requestBody.Name
+
+	if name == "" {
+		sendHttpError(w, BadBodyError, http.StatusBadRequest)
+		return
 	}
 
-	response := VirtualServerDTO{
-		Name: requestedName,
+	newServer := NewServerState(name, StoppedServerStatus)
+
+	ServerCache = append(ServerCache, newServer)
+
+	response := VirtualServerListDTO{
+		Payload: convertToServerListDTO(ServerCache),
 	}
 
 	// Set the Content-Type header.
@@ -44,7 +88,115 @@ func handleVirtualServerStateRequest(w http.ResponseWriter, r *http.Request) {
 	// Serialize the map to JSON and write it to the response.
 	err = json.NewEncoder(w).Encode(response)
 	if err != nil {
-		log.Printf("handleVirtualServerStateRequest: encoding: error: %v", err)
+		log.Printf("handleApiServerCreateRequest: encoding: error: %v", err)
+		sendHttpError(w, EncodingFailedError, http.StatusInternalServerError)
+		return
+	}
+
+}
+
+func convertToServerDTO(
+	cache ServerState,
+) VirtualServerDTO {
+	return VirtualServerDTO{
+		Name:   cache.Name,
+		Status: cache.Status,
+	}
+}
+
+func convertToServerListDTO(
+	cache []*ServerState,
+) []VirtualServerDTO {
+
+	// Create a slice to hold the converted DTOs
+	serverDTOList := make([]VirtualServerDTO, len(cache))
+
+	// Iterate over the slice and convert each ServerState to VirtualServerDTO
+	for i, server := range cache {
+		serverDTOList[i] = convertToServerDTO(*server)
+	}
+
+	return serverDTOList
+}
+
+func handleApiServerListRequest(w http.ResponseWriter, r *http.Request) {
+
+	if r.Method == "POST" {
+		handleApiServerCreateRequest(w, r)
+		return
+	}
+
+	httpRequestsTotal.WithLabelValues(r.URL.Path).Inc()
+
+	authorization := r.Header.Get("Authorization")
+	isValidSession := authorization == "Bearer "+ServerAdminSessionToken
+
+	if !isValidSession {
+		sendHttpError(w, UnauthorizedError, http.StatusUnauthorized)
+		return
+	}
+
+	response := VirtualServerListDTO{
+		Payload: convertToServerListDTO(ServerCache),
+	}
+
+	// Set the Content-Type header.
+	w.Header().Set("Content-Type", "application/json")
+
+	// Serialize the map to JSON and write it to the response.
+	err := json.NewEncoder(w).Encode(response)
+	if err != nil {
+		log.Printf("handleApiServerListRequest: encoding: error: %v", err)
+		sendHttpError(w, EncodingFailedError, http.StatusInternalServerError)
+		return
+	}
+
+}
+
+func handleApiAuthRequest(w http.ResponseWriter, r *http.Request) {
+
+	httpRequestsTotal.WithLabelValues(r.URL.Path).Inc()
+
+	// Initialize an instance of VirtualServerDTO
+	var requestBody AuthenticateEmailDTO
+
+	// Decode the request body into requestBody
+	err := json.NewDecoder(r.Body).Decode(&requestBody)
+	if err != nil {
+		sendHttpError(w, BadBodyError, http.StatusBadRequest)
+		return
+	}
+
+	var email string = requestBody.Email
+	var password string = requestBody.Password
+
+	if email != ServerAdminEmail || password != ServerAdminPassword {
+		sendHttpError(w, UnauthorizedError, http.StatusUnauthorized)
+		return
+	}
+
+	token, err2 := generateAuthToken()
+	if err2 != nil {
+		log.Printf("handleApiAuthRequest: generating session: error: %v", err2)
+		sendHttpError(w, SessionGenerationFailedError, http.StatusInternalServerError)
+		return
+	}
+
+	ServerAdminSessionToken = token
+
+	response := EmailTokenDTO{
+		Token:    token,
+		Email:    email,
+		Verified: true,
+	}
+
+	// Set the Content-Type header.
+	w.Header().Set("Content-Type", "application/json")
+
+	// Serialize the map to JSON and write it to the response.
+	err = json.NewEncoder(w).Encode(response)
+	if err != nil {
+		log.Printf("handleApiAuthRequest: encoding: error: %v", err)
 		sendHttpError(w, EncodingFailedError, http.StatusInternalServerError)
 		return
 	}
@@ -62,8 +214,10 @@ func startLocalServer(listen string) {
 		fileServerHandler.ServeHTTP(w, r)
 	})
 
+	r.HandleFunc("/api/v1", handleApiIndexRequest)
+	r.HandleFunc("/api/v1/auth", handleApiAuthRequest)
+	r.HandleFunc("/api/v1/servers", handleApiServerListRequest)
 	r.Handle("/metrics", promhttp.Handler())
-	r.HandleFunc("/api/v1", handleVirtualServerStateRequest)
 	r.PathPrefix("/").Handler(http.StripPrefix("/", wrappedFileServerHandler))
 
 	err := http.ListenAndServe(listen, r)

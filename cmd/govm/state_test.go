@@ -1,4 +1,4 @@
-// Copyright (c) 2024. Heusala Group Ltd <info@hg.fi>. All rights reserved.
+// Copyright (c) 2024. Sendanor <info@sendanor.fi>. All rights reserved.
 
 package main
 
@@ -8,7 +8,7 @@ import (
 
 func TestNewVirtualServerState(t *testing.T) {
 	now := NewTimeNow()
-	gs := NewVirtualServerState(now)
+	gs := NewServerState(now)
 
 	if gs.Created != gs.Updated {
 		t.Errorf("Expected Created (%v) and Updated (%v) to be equal", gs.Created, gs.Updated)

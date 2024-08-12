@@ -6,7 +6,7 @@ FSL-1.1-MIT
 
 ## Notice
 
-Copyright 2024 Heusala Group Ltd <info@hg.fi>
+Copyright 2024 Sendanor <info@sendanor.fi>
 
 ## Terms and Conditions
 

@@ -1,4 +1,4 @@
-// Copyright (c) 2024. Heusala Group Ltd <info@hg.fi>. All rights reserved.
+// Copyright (c) 2024. Sendanor <info@sendanor.fi>. All rights reserved.
 
 package main
 
@@ -10,15 +10,21 @@ import (
 	"os"
 	"strconv"
 
-	govm "govm"
+	"govm"
 )
 
 var ServerKey []byte
+var ServerAdminEmail string
+var ServerAdminPassword string
+var ServerAdminSessionToken string
+var ServerCache []*ServerState
 
 func main() {
 
 	// Define flags
 	addr := flag.String("addr", "", "change default address to listen")
+	adminEmail := flag.String("admin-email", "", "change default admin email address")
+	adminPassword := flag.String("admin-password", "", "change default admin password")
 	privateKeyString := flag.String("private-key", parseStringEnv("PRIVATE_KEY", ""), "set private key")
 	port := flag.Int("port", parseIntEnv("PORT", 3001), "change default port")
 	version := flag.Bool("version", false, "Show version information")
@@ -32,6 +38,26 @@ func main() {
 	if *version {
 		fmt.Printf("%s v%s by %s\nURL = %s\n", govm.Name, govm.Version, govm.Author, govm.URL)
 		return
+	}
+
+	if *adminEmail == "" {
+		ServerAdminEmail = DefaultAdminUserEmail
+	} else {
+		ServerAdminEmail = *adminEmail
+	}
+	fmt.Printf("ADMIN_EMAIL=%s\n", ServerAdminEmail)
+
+	if *adminPassword == "" {
+		password, err := generatePassword()
+		if err != nil {
+			fmt.Printf("ERROR: Failed to generate admin password: %v\n", err)
+			os.Exit(1)
+		} else {
+			fmt.Printf("ADMIN_PASSWORD=%s\n", password)
+		}
+		ServerAdminPassword = password
+	} else {
+		ServerAdminPassword = *adminPassword
 	}
 
 	if *initPrivateKey {

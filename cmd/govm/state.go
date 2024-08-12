@@ -1,4 +1,4 @@
-// Copyright (c) 2024. Heusala Group Ltd <info@hg.fi>. All rights reserved.
+// Copyright (c) 2024. Sendanor <info@sendanor.fi>. All rights reserved.
 
 package main
 
@@ -9,49 +9,59 @@ import (
 	"time"
 )
 
-// VirtualServerState This is the actual state of the game, which is encrypted to
-// the Private field of VirtualServerStateDTO.
-type VirtualServerState struct {
+const InitializingServerStatus string = "initializing"
+const StoppingServerStatus string = "stopping"
+const StartingServerStatus string = "starting"
+const StoppedServerStatus string = "stopped"
+const StartedServerStatus string = "started"
+const DeletingServerStatus string = "deleting"
 
-	// Name the name of the player
+// ServerState This is the actual state of the game, which is encrypted to
+// the Private field of VirtualServerStateDTO.
+type ServerState struct {
+
+	// Name the name of the virtual server
 	Name string `json:"name"`
 
-	// Created the time when game was started
-	Created int64 `json:"created"`
-
-	// Updated the time when game state was updated
-	Updated int64 `json:"updated"`
+	// Status the status of the virtual server
+	Status string `json:"status"`
 }
 
 func NewTimeNow() int64 {
 	return time.Now().UnixMilli()
 }
 
-func NewVirtualServerState(
-	now int64,
-) *VirtualServerState {
-	return &VirtualServerState{
-		Name:    fmt.Sprintf("Guest%d", rand.Intn(90000)+10000),
-		Created: now,
-		Updated: now,
+func NewServerState(
+	name string,
+	status string,
+) *ServerState {
+	if name == "" {
+		name = fmt.Sprintf("Domain%d", rand.Intn(90000)+10000)
+	}
+	if status == "" {
+		status = StoppedServerStatus
+	}
+	return &ServerState{
+		Name:   name,
+		Status: status,
 	}
 }
 
-// Encrypt serializes the VirtualServerState to JSON, then encrypts it.
-func (g *VirtualServerState) Encrypt(key []byte) (string, error) {
+// Encrypt serializes the ServerState to JSON, then encrypts it.
+func (g *ServerState) Encrypt(key []byte) (string, error) {
 
 	jsonData, err := json.Marshal(*g)
 	if err != nil {
 		// Not unit tested, hard to test.
-		return "", fmt.Errorf("VirtualServerState.Encrypt: failed to stringify as json: %w", err)
+		return "", fmt.Errorf("ServerState.Encrypt: failed to stringify as json: %w", err)
 	}
 
 	// Encrypt the JSON string
 	return encrypt(string(jsonData), key)
 }
 
-// DecryptVirtualServerState decrypts the encrypted string and deserializes the JSON back into a VirtualServerState.
-func DecryptVirtualServerState(encryptedData string, key []byte) (*VirtualServerState, error) {
+// DecryptVirtualServerState decrypts the encrypted string and deserializes the JSON back into a ServerState.
+func DecryptVirtualServerState(encryptedData string, key []byte) (*ServerState, error) {
 
 	// Decrypt the data to get the JSON string
 	decryptedData, err := decrypt(encryptedData, key)
@@ -59,7 +69,7 @@ func DecryptVirtualServerState(encryptedData string, key []byte) (*VirtualServer
 		return nil, fmt.Errorf("DecryptVirtualServerState: failed to decrypt json: %w", err)
 	}
 
-	var dto VirtualServerState
+	var dto ServerState
 	err = json.Unmarshal([]byte(decryptedData), &dto)
 	if err != nil {
 		// Not unit tested, hard to test.
