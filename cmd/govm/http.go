@@ -13,15 +13,9 @@ import (
 	frontend "govm/internal"
 )
 
-func handleApiIndexRequest(w http.ResponseWriter, r *http.Request) {
-
-	httpRequestsTotal.WithLabelValues(r.URL.Path).Inc()
-
-	authorization := r.Header.Get("Authorization")
-	isValidSession := authorization == "Bearer "+ServerAdminSessionToken
-
-	// Set the Content-Type header.
-	w.Header().Set("Content-Type", "application/json")
+func onApiIndexRequest(w http.ResponseWriter, r *http.Request) {
+	logRequest("onApiIndexRequest", r)
+	isValidSession := authenticateSession(r)
 
 	var response IndexDTO
 	if isValidSession {
@@ -36,134 +30,92 @@ func handleApiIndexRequest(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	err := json.NewEncoder(w).Encode(response)
-	if err != nil {
-		log.Printf("handleApiIndexRequest: encoding: error: %v", err)
-		sendHttpError(w, EncodingFailedError, http.StatusInternalServerError)
-		return
-	}
-
+	sendJsonData("onApiIndexRequest", w, response)
 }
 
-func handleApiServerCreateRequest(w http.ResponseWriter, r *http.Request) {
+func onApiCreateServerRequest(w http.ResponseWriter, r *http.Request) {
 
-	httpRequestsTotal.WithLabelValues(r.URL.Path).Inc()
+	logRequest("onApiCreateServerRequest", r)
 
-	authorization := r.Header.Get("Authorization")
-	isValidSession := authorization == "Bearer "+ServerAdminSessionToken
-
+	isValidSession := authenticateSession(r)
 	if !isValidSession {
-		sendHttpError(w, UnauthorizedError, http.StatusUnauthorized)
+		sendJsonError("onApiCreateServerRequest", w, UnauthorizedError, http.StatusUnauthorized)
 		return
 	}
 
-	// Initialize an instance of VirtualServerDTO
-	var requestBody CreateVirtualServerDTO
+	// Initialize an instance of ServerDTO
+	var requestBody CreateServerDTO
 
 	// Decode the request body into requestBody
 	err := json.NewDecoder(r.Body).Decode(&requestBody)
 	if err != nil {
-		sendHttpError(w, BadBodyError, http.StatusBadRequest)
+		sendJsonError("onApiCreateServerRequest", w, BadBodyError, http.StatusBadRequest)
 		return
 	}
 
 	var name string = *requestBody.Name
-
 	if name == "" {
-		sendHttpError(w, BadBodyError, http.StatusBadRequest)
+		sendJsonError("onApiCreateServerRequest", w, BadBodyError, http.StatusBadRequest)
 		return
 	}
 
-	newServer := NewServerState(name, StoppedServerStatus)
+	item := NewServerState(name, StoppedServerStatusCode)
+	ServerCache = append(ServerCache, item)
 
-	ServerCache = append(ServerCache, newServer)
+	response := ToServerListDTO(ServerCache)
+	sendJsonData("onApiCreateServerRequest", w, response)
+}
 
-	response := VirtualServerListDTO{
-		Payload: convertToServerListDTO(ServerCache),
-	}
+func onApiServerListRequest(w http.ResponseWriter, r *http.Request) {
 
-	// Set the Content-Type header.
-	w.Header().Set("Content-Type", "application/json")
+	logRequest("onApiServerListRequest", r)
 
-	// Serialize the map to JSON and write it to the response.
-	err = json.NewEncoder(w).Encode(response)
-	if err != nil {
-		log.Printf("handleApiServerCreateRequest: encoding: error: %v", err)
-		sendHttpError(w, EncodingFailedError, http.StatusInternalServerError)
+	isValidSession := authenticateSession(r)
+	if !isValidSession {
+		sendJsonError("onApiServerListRequest", w, UnauthorizedError, http.StatusUnauthorized)
 		return
 	}
 
+	response := ToServerListDTO(ServerCache)
+	sendJsonData("onApiServerListRequest", w, response)
+
 }
 
-func convertToServerDTO(
-	cache ServerState,
-) VirtualServerDTO {
-	return VirtualServerDTO{
-		Name:   cache.Name,
-		Status: cache.Status,
-	}
-}
+func onApiServerRequest(w http.ResponseWriter, r *http.Request) {
 
-func convertToServerListDTO(
-	cache []*ServerState,
-) []VirtualServerDTO {
+	logRequest("onApiServerListRequest", r)
 
-	// Create a slice to hold the converted DTOs
-	serverDTOList := make([]VirtualServerDTO, len(cache))
+	vars := mux.Vars(r)
+	name := vars["name"]
 
-	// Iterate over the slice and convert each ServerState to VirtualServerDTO
-	for i, server := range cache {
-		serverDTOList[i] = convertToServerDTO(*server)
-	}
-
-	return serverDTOList
-}
-
-func handleApiServerListRequest(w http.ResponseWriter, r *http.Request) {
-
-	if r.Method == "POST" {
-		handleApiServerCreateRequest(w, r)
-		return
-	}
-
-	httpRequestsTotal.WithLabelValues(r.URL.Path).Inc()
-
-	authorization := r.Header.Get("Authorization")
-	isValidSession := authorization == "Bearer "+ServerAdminSessionToken
+	isValidSession := authenticateSession(r)
 
 	if !isValidSession {
-		sendHttpError(w, UnauthorizedError, http.StatusUnauthorized)
+		sendJsonError("onApiServerListRequest", w, UnauthorizedError, http.StatusUnauthorized)
 		return
 	}
 
-	response := VirtualServerListDTO{
-		Payload: convertToServerListDTO(ServerCache),
+	item, isFound := FindServerStateByName(ServerCache, name)
+	if !isFound {
+		sendJsonError("onApiServerListRequest", w, NotFoundError, http.StatusNotFound)
 	}
 
-	// Set the Content-Type header.
-	w.Header().Set("Content-Type", "application/json")
-
-	// Serialize the map to JSON and write it to the response.
-	err := json.NewEncoder(w).Encode(response)
-	if err != nil {
-		log.Printf("handleApiServerListRequest: encoding: error: %v", err)
-		sendHttpError(w, EncodingFailedError, http.StatusInternalServerError)
-		return
-	}
+	response := item.ToDTO()
+	sendJsonData("onApiServerListRequest", w, response)
 
 }
 
-func handleApiAuthRequest(w http.ResponseWriter, r *http.Request) {
+func onApiAuthRequest(w http.ResponseWriter, r *http.Request) {
 
-	httpRequestsTotal.WithLabelValues(r.URL.Path).Inc()
+	logRequest("onApiAuthRequest", r)
 
-	// Initialize an instance of VirtualServerDTO
+	// Initialize an instance of ServerDTO
 	var requestBody AuthenticateEmailDTO
 
 	// Decode the request body into requestBody
 	err := json.NewDecoder(r.Body).Decode(&requestBody)
 	if err != nil {
-		sendHttpError(w, BadBodyError, http.StatusBadRequest)
+		sendJsonError("onApiAuthRequest", w, BadBodyError, http.StatusBadRequest)
 		return
 	}
 
@@ -171,14 +123,14 @@ func handleApiAuthRequest(w http.ResponseWriter, r *http.Request) {
 	var password string = requestBody.Password
 
 	if email != ServerAdminEmail || password != ServerAdminPassword {
-		sendHttpError(w, UnauthorizedError, http.StatusUnauthorized)
+		sendJsonError("onApiAuthRequest", w, UnauthorizedError, http.StatusUnauthorized)
 		return
 	}
 
 	token, err2 := generateAuthToken()
 	if err2 != nil {
-		log.Printf("handleApiAuthRequest: generating session: error: %v", err2)
-		sendHttpError(w, SessionGenerationFailedError, http.StatusInternalServerError)
+		log.Printf("onApiAuthRequest: generating session: error: %v", err2)
+		sendJsonError("onApiAuthRequest", w, SessionGenerationFailedError, http.StatusInternalServerError)
 		return
 	}
 
@@ -190,38 +142,67 @@ func handleApiAuthRequest(w http.ResponseWriter, r *http.Request) {
 		Verified: true,
 	}
 
-	// Set the Content-Type header.
-	w.Header().Set("Content-Type", "application/json")
-
-	// Serialize the map to JSON and write it to the response.
-	err = json.NewEncoder(w).Encode(response)
-	if err != nil {
-		log.Printf("handleApiAuthRequest: encoding: error: %v", err)
-		sendHttpError(w, EncodingFailedError, http.StatusInternalServerError)
-		return
-	}
+	sendJsonData("onApiServerListRequest", w, response)
 
 }
 
-func startLocalServer(listen string) {
+func startApiServer(listen string) {
 
 	r := mux.NewRouter()
 
-	// Wrap the file server handler to track requests using Prometheus
+	// Wrap the file server onr to track requests using Prometheus
 	fileServerHandler := http.FileServer(http.FS(frontend.BuildFS))
 	wrappedFileServerHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		httpRequestsTotal.WithLabelValues(r.URL.Path).Inc()
+		logRequest("wrappedFileServerHandler", r)
 		fileServerHandler.ServeHTTP(w, r)
 	})
 
-	r.HandleFunc("/api/v1", handleApiIndexRequest)
-	r.HandleFunc("/api/v1/auth", handleApiAuthRequest)
-	r.HandleFunc("/api/v1/servers", handleApiServerListRequest)
+	r.HandleFunc("/api/v1", onApiIndexRequest).Methods("GET")
+	r.HandleFunc("/api/v1/auth", onApiAuthRequest).Methods("GET", "POST")
+	r.HandleFunc("/api/v1/servers", onApiServerListRequest).Methods("GET")
+	r.HandleFunc("/api/v1/servers", onApiCreateServerRequest).Methods("POST")
+	r.HandleFunc("/api/v1/servers/{name}", onApiServerRequest).Methods("GET")
 	r.Handle("/metrics", promhttp.Handler())
 	r.PathPrefix("/").Handler(http.StripPrefix("/", wrappedFileServerHandler))
 
 	err := http.ListenAndServe(listen, r)
 	if err != nil {
 		panic("failed to start http server")
+	}
+}
+
+func logRequest(method string, r *http.Request) {
+	log.Printf("%s: %s %s", method, r.Method, r.URL.Path)
+	httpRequestsTotal.WithLabelValues(r.URL.Path).Inc()
+}
+
+func authenticateSession(r *http.Request) bool {
+	authorization := r.Header.Get("Authorization")
+	return authorization == "Bearer "+ServerAdminSessionToken
+}
+
+func sendJsonError(method string, w http.ResponseWriter, code string, status int) {
+	recordFailedOperationMetric(code)
+	w.Header().Set("Content-Type", "application/json")
+	response := ErrorDTO{
+		Error: code,
+		Code:  status,
+	}
+	w.WriteHeader(status)
+	err := json.NewEncoder(w).Encode(response)
+	if err != nil {
+		log.Printf("%s: encoding: error: %v", method, err)
+		http.Error(w, code, status)
+		return
+	}
+}
+
+func sendJsonData(method string, w http.ResponseWriter, response any) {
+	w.Header().Set("Content-Type", "application/json")
+	err := json.NewEncoder(w).Encode(response)
+	if err != nil {
+		log.Printf("%s: encoding: error: %v", method, err)
+		sendJsonError(method, w, EncodingFailedError, http.StatusInternalServerError)
+		return
 	}
 }

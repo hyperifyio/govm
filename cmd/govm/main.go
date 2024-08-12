@@ -3,7 +3,6 @@
 package main
 
 import (
-	"encoding/hex"
 	"flag"
 	"fmt"
 	"log"
@@ -13,7 +12,6 @@ import (
 	"govm"
 )
 
-var ServerKey []byte
 var ServerAdminEmail string
 var ServerAdminPassword string
 var ServerAdminSessionToken string
@@ -22,13 +20,11 @@ var ServerCache []*ServerState
 func main() {
 
 	// Define flags
-	addr := flag.String("addr", "", "change default address to listen")
-	adminEmail := flag.String("admin-email", "", "change default admin email address")
-	adminPassword := flag.String("admin-password", "", "change default admin password")
-	privateKeyString := flag.String("private-key", parseStringEnv("PRIVATE_KEY", ""), "set private key")
+	addr := flag.String("addr", parseStringEnv("GOVM_ADDRESS", ""), "change default address to listen")
+	adminEmail := flag.String("admin-email", parseStringEnv("GOVM_ADMIN_EMAIL", ""), "change default admin email address")
+	adminPassword := flag.String("admin-password", parseStringEnv("GOVM_ADMIN_PASSWORD", ""), "change default admin password")
 	port := flag.Int("port", parseIntEnv("PORT", 3001), "change default port")
 	version := flag.Bool("version", false, "Show version information")
-	initPrivateKey := flag.Bool("init-private-key", false, "Create a new private key and print it")
 
 	listenTo := fmt.Sprintf("%s:%d", *addr, *port)
 
@@ -60,39 +56,8 @@ func main() {
 		ServerAdminPassword = *adminPassword
 	}
 
-	if *initPrivateKey {
-		key, err := generateKey()
-		if err != nil {
-			fmt.Printf("ERROR: Failed to generate key: %v\n", err)
-			os.Exit(1)
-		} else {
-			fmt.Printf("PRIVATE_KEY=%s\n", hex.EncodeToString(key))
-		}
-		return
-	}
-
-	if *privateKeyString == "" {
-		key, err := generateKey()
-		if err != nil {
-			log.Printf("ERROR: Failed to generate key: %v\n", err)
-			os.Exit(1)
-		} else {
-			log.Printf("Warning! Initialized with a random private key '%s'. You might want to make this persistent.\n", hex.EncodeToString(key))
-			ServerKey = key
-		}
-	} else {
-		key, err := hex.DecodeString(*privateKeyString)
-		if err != nil {
-			fmt.Printf("ERROR: Failed to decode private key: %v\n", err)
-			os.Exit(1)
-		} else {
-			ServerKey = key
-		}
-	}
-
 	log.Printf("Starting server at %s\n", listenTo)
-
-	startLocalServer(listenTo)
+	startApiServer(listenTo)
 
 }
 

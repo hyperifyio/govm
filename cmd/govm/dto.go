@@ -2,6 +2,16 @@
 
 package main
 
+// ErrorDTO struct defines the structure of the body for API errors
+type ErrorDTO struct {
+
+	// Error is the error message
+	Error string `json:"error"`
+
+	// Code is the error code
+	Code int `json:"code,omitempty"`
+}
+
 // AuthenticateEmailDTO struct defines the structure of the body to authenticate a session
 type AuthenticateEmailDTO struct {
 
@@ -35,26 +45,36 @@ type IndexDTO struct {
 	Email string `json:"email"`
 }
 
-// VirtualServerDTO struct defines the structure of the response DTO returned from the server
-type VirtualServerDTO struct {
+// ServerDTO struct defines the structure of the response DTO returned from the server
+type ServerDTO struct {
 
 	// Name is the name of the virtual server
 	Name string `json:"name"`
 
 	// Status is the status of the virtual server
 	Status string `json:"status"`
+
+	// Actions which are available to perform on the server
+	Actions []string `json:"actions"`
 }
 
-// CreateVirtualServerDTO defines the structure of the request body to deploy a new server
-type CreateVirtualServerDTO struct {
+// CreateServerDTO defines the structure of the request body to deploy a new server
+type CreateServerDTO struct {
 
-	// Name Optional name of the virtual server
+	// Name Optional name of the server
 	Name *string `json:"name,omitempty"`
 }
 
-// VirtualServerListDTO struct defines the structure of the response DTO returned from the server
-type VirtualServerListDTO struct {
+// ServerActionDTO defines the structure of the request body to perform an action on the server
+type ServerActionDTO struct {
+
+	// Action to perform
+	Action string `json:"action"`
+}
+
+// ServerListDTO struct defines the structure of the response DTO returned from the server
+type ServerListDTO struct {
 
 	// Payload is
-	Payload []VirtualServerDTO `json:"payload"`
+	Payload []ServerDTO `json:"payload"`
 }

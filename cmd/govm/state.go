@@ -3,43 +3,27 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"math/rand"
-	"time"
 )
-
-const InitializingServerStatus string = "initializing"
-const StoppingServerStatus string = "stopping"
-const StartingServerStatus string = "starting"
-const StoppedServerStatus string = "stopped"
-const StartedServerStatus string = "started"
-const DeletingServerStatus string = "deleting"
 
 // ServerState This is the actual state of the game, which is encrypted to
 // the Private field of VirtualServerStateDTO.
 type ServerState struct {
 
-	// Name the name of the virtual server
-	Name string `json:"name"`
+	// Name the name of the server
+	Name string
 
-	// Status the status of the virtual server
-	Status string `json:"status"`
-}
-
-func NewTimeNow() int64 {
-	return time.Now().UnixMilli()
+	// Status the status of the server
+	Status ServerStatusCode
 }
 
 func NewServerState(
 	name string,
-	status string,
+	status ServerStatusCode,
 ) *ServerState {
 	if name == "" {
 		name = fmt.Sprintf("Domain%d", rand.Intn(90000)+10000)
-	}
-	if status == "" {
-		status = StoppedServerStatus
 	}
 	return &ServerState{
 		Name:   name,
@@ -47,34 +31,48 @@ func NewServerState(
 	}
 }
 
-// Encrypt serializes the ServerState to JSON, then encrypts it.
-func (g *ServerState) Encrypt(key []byte) (string, error) {
-
-	jsonData, err := json.Marshal(*g)
-	if err != nil {
-		// Not unit tested, hard to test.
-		return "", fmt.Errorf("ServerState.Encrypt: failed to stringify as json: %w", err)
+func (item *ServerState) ToDTO() ServerDTO {
+	return ServerDTO{
+		Name:    item.Name,
+		Status:  item.Status.String(),
+		Actions: ToStatusStringList(item.Status.GetAvailableActions()),
 	}
-
-	// Encrypt the JSON string
-	return encrypt(string(jsonData), key)
 }
 
-// DecryptVirtualServerState decrypts the encrypted string and deserializes the JSON back into a ServerState.
-func DecryptVirtualServerState(encryptedData string, key []byte) (*ServerState, error) {
-
-	// Decrypt the data to get the JSON string
-	decryptedData, err := decrypt(encryptedData, key)
-	if err != nil {
-		return nil, fmt.Errorf("DecryptVirtualServerState: failed to decrypt json: %w", err)
+func ToServerListArray(
+	list []*ServerState,
+) []ServerDTO {
+	serverDTOList := make([]ServerDTO, len(list))
+	for i, item := range list {
+		serverDTOList[i] = (*item).ToDTO()
 	}
+	return serverDTOList
+}
 
-	var dto ServerState
-	err = json.Unmarshal([]byte(decryptedData), &dto)
-	if err != nil {
-		// Not unit tested, hard to test.
-		return nil, fmt.Errorf("DecryptVirtualServerState: failed to parse json: %w", err)
+func ToServerListDTO(
+	list []*ServerState,
+) ServerListDTO {
+	return ServerListDTO{
+		Payload: ToServerListArray(list),
 	}
+}
 
-	return &dto, nil
+func ToStatusStringList(
+	list []ServerActionCode,
+) []string {
+	ret := make([]string, len(list))
+	for i, item := range list {
+		ret[i] = item.String()
+	}
+	return ret
+}
+
+func FindServerStateByName(states []*ServerState, name string) (*ServerState, bool) {
+	for _, state := range states {
+		if state.Name == name {
+			return state, true
+		}
+	}
+	// Return an empty ServerState and false if not found
+	return nil, false
 }
