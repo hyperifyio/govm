@@ -10,7 +10,7 @@ tidy:
 build: govm
 
 govm: $(GOVM_SOURCES) Makefile
-	CGO_ENABLED=0 GOOS=$(GOOS) GOARCH=$(GOARCH) go build -ldflags '-extldflags "-static"' -o govm ./cmd/govm
+	CGO_ENABLED=1 GOOS=$(GOOS) GOARCH=$(GOARCH) go build -o govm ./cmd/govm
 
 test: Makefile
 	go test -v ./...

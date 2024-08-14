@@ -8,11 +8,29 @@ Source code for govm project
 git clone --recurse-submodules -j8 git@github.com:hyperifyio/govm.git
 ```
 
-or update:
+...or update:
 
 ```
 git submodule update
 ```
+
+## Requirements for MacOS
+
+For MacOS, you need to install `libvirt` and QEMU version 2.12 or newer.
+
+```
+brew install dbus-glib libvirt
+```
+
+Read more about [libvirt MacOS support](https://libvirt.org/macos.html).
+
+Then either install it as a service:
+
+`brew services start libvirt`
+
+..or run manually: `/opt/homebrew/opt/libvirt/sbin/libvirtd -f /opt/homebrew/etc/libvirt/libvirtd.conf`
+
+Then use `GOVM_SYSTEM='qemu:///session'` when starting the govm.
 
 ## Starting the server with Docker for development
 

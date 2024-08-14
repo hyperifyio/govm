@@ -7,9 +7,8 @@ import (
 	"math/rand"
 )
 
-// ServerState This is the actual state of the game, which is encrypted to
-// the Private field of VirtualServerStateDTO.
-type ServerState struct {
+// ServerModel This is the data model of the server inside the GoVM
+type ServerModel struct {
 
 	// Name the name of the server
 	Name string
@@ -18,20 +17,20 @@ type ServerState struct {
 	Status ServerStatusCode
 }
 
-func NewServerState(
+func NewServerModel(
 	name string,
 	status ServerStatusCode,
-) *ServerState {
+) *ServerModel {
 	if name == "" {
-		name = fmt.Sprintf("Domain%d", rand.Intn(90000)+10000)
+		name = fmt.Sprintf("Server%d", rand.Intn(90000)+10000)
 	}
-	return &ServerState{
+	return &ServerModel{
 		Name:   name,
 		Status: status,
 	}
 }
 
-func (item *ServerState) ToDTO() ServerDTO {
+func (item *ServerModel) ToDTO() ServerDTO {
 	return ServerDTO{
 		Name:    item.Name,
 		Status:  item.Status.String(),
@@ -40,7 +39,7 @@ func (item *ServerState) ToDTO() ServerDTO {
 }
 
 func ToServerListArray(
-	list []*ServerState,
+	list []*ServerModel,
 ) []ServerDTO {
 	serverDTOList := make([]ServerDTO, len(list))
 	for i, item := range list {
@@ -50,7 +49,7 @@ func ToServerListArray(
 }
 
 func ToServerListDTO(
-	list []*ServerState,
+	list []*ServerModel,
 ) ServerListDTO {
 	return ServerListDTO{
 		Payload: ToServerListArray(list),
@@ -65,14 +64,4 @@ func ToStatusStringList(
 		ret[i] = item.String()
 	}
 	return ret
-}
-
-func FindServerStateByName(states []*ServerState, name string) (*ServerState, bool) {
-	for _, state := range states {
-		if state.Name == name {
-			return state, true
-		}
-	}
-	// Return an empty ServerState and false if not found
-	return nil, false
 }

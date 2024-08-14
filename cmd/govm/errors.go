@@ -9,6 +9,8 @@ const (
 	EncodingFailedError          = "encoding-failed"
 	SessionGenerationFailedError = "session-generation-failed"
 	NotFoundError                = "not-found"
+	InternalServerError          = "internal-server-error"
+	InvalidMethod                = "invalid-method"
 	UnauthorizedError            = "unauthorized"
 	BadBodyError                 = "bad-body"
 	LimitParseError              = "limit-parse-failed"

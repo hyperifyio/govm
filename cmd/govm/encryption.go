@@ -8,7 +8,9 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/hex"
+	"errors"
 	"io"
+	"math/big"
 )
 
 // Generate a new auth token
@@ -21,12 +23,23 @@ func generateAuthToken() (string, error) {
 }
 
 // Generate a new password
-func generatePassword() (string, error) {
-	key := make([]byte, 16) // AES-256
-	if _, err := io.ReadFull(rand.Reader, key); err != nil {
-		return "", err
+func generatePassword(length int) (string, error) {
+	if length <= 0 {
+		return "", errors.New("length must be greater than 0")
 	}
-	return hex.EncodeToString(key), nil
+
+	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+
+	result := make([]byte, length)
+	for i := range result {
+		randomIndex, err := rand.Int(rand.Reader, big.NewInt(int64(len(charset))))
+		if err != nil {
+			return "", err
+		}
+		result[i] = charset[randomIndex.Int64()]
+	}
+
+	return string(result), nil
 }
 
 // Generate a new AES key
