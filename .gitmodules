@@ -1,3 +1,6 @@
 [submodule "internal/frontend-govm"]
 	path = internal/frontend-govm
 	url = https://github.com/hyperifyio/frontend-govm.git
+[submodule "internal/frontend-novnc"]
+	path = internal/frontend-novnc
+	url = https://github.com/novnc/noVNC.git

@@ -78,3 +78,19 @@ type ServerListDTO struct {
 	// Payload is
 	Payload []ServerDTO `json:"payload"`
 }
+
+// ServerVncDTO defines an response to open a VNC console
+type ServerVncDTO struct {
+
+	// URL is the URL to bundled novnc service
+	URL string `json:"url"`
+
+	// Path is the path for websocket interface
+	WS string `json:"ws"`
+
+	// Password is the VNC password
+	Password string `json:"password"`
+
+	// Token is the VNC token
+	Token string `json:"token"`
+}

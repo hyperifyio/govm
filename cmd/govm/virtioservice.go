@@ -4,6 +4,7 @@ package main
 
 import (
 	"crypto/rand"
+	"encoding/xml"
 	"fmt"
 	"io"
 	"log"
@@ -42,17 +43,17 @@ func NewVirtioService(
 }
 
 func (s *VirtioService) Start() error {
-	log.Printf("Connecting libvirt to %s", s.system)
+	log.Printf("Start: Connecting libvirt to %s", s.system)
 	conn, err := libvirt.NewConnect(s.system)
 	if err != nil {
-		return fmt.Errorf("start: Could not connect to libvirt: %v", err)
+		return fmt.Errorf("Start: Could not connect to libvirt: %v", err)
 	}
 	defer conn.Close()
 	doms, err := conn.ListAllDomains(libvirt.CONNECT_LIST_DOMAINS_ACTIVE)
 	if err != nil {
-		return fmt.Errorf("start: Could not list domains: %v", err)
+		return fmt.Errorf("Start: Could not list domains: %v", err)
 	}
-	fmt.Printf("%d running domains\n", len(doms))
+	fmt.Printf("Start: %d running domains\n", len(doms))
 	return nil
 }
 
@@ -137,13 +138,13 @@ func (s *VirtioService) AddServer(
 
 	_, err = os.Stat(diskFile)
 	if err == nil {
-		log.Printf("Warning! Using existing image file: %s", diskFile)
+		log.Printf("AddServer: Warning! Using existing image file: %s", diskFile)
 	} else if os.IsNotExist(err) {
 		err = copyImageFile(imageFile, diskFile)
 		if err != nil {
 			return nil, fmt.Errorf("AddServer: failed to copy image file: %v", err)
 		}
-		log.Printf("Image file copied to: %s", diskFile)
+		log.Printf("AddServer: Image file copied to: %s", diskFile)
 	} else {
 		return nil, fmt.Errorf("AddServer: failed to stat image file: %v", err)
 	}
@@ -278,7 +279,7 @@ ethernets:
 
 func (s *VirtioService) GetServerList() ([]*ServerModel, error) {
 	var servers []*ServerModel
-	log.Printf("Connecting libvirt to %s", s.system)
+	log.Printf("GetServerList: Connecting libvirt to %s", s.system)
 	conn, err := libvirt.NewConnect(s.system)
 	if err != nil {
 		return nil, fmt.Errorf("GetServerList: failed to connect to libvirt: %v", err)
@@ -469,7 +470,110 @@ func (s *VirtioService) DeleteServer(name string) (*ServerModel, error) {
 	return model, nil
 }
 
+func (s *VirtioService) GetVNC(name string) (string, error) {
+
+	log.Printf("GetVNC: Connecting libvirt to %s", s.system)
+	conn, err := libvirt.NewConnect(s.system)
+	if err != nil {
+		return "", fmt.Errorf("GetVNC: failed to connect to libvirt: %v", err)
+	}
+	defer conn.Close()
+
+	item, err := conn.LookupDomainByName(name)
+	if err != nil {
+		libvirtError, ok := err.(libvirt.Error)
+		if ok && libvirtError.Code == libvirt.ERR_NO_DOMAIN {
+			return "", fmt.Errorf("GetVNC: Failed to find the domain: %s: Not Found", name)
+		} else {
+			return "", fmt.Errorf("GetVNC: Failed to find the domain: %s: %v", name, err)
+		}
+	}
+	if item == nil {
+		return "", fmt.Errorf("GetVNC: Failed to find the domain by name: %s", name)
+	}
+	defer item.Free()
+
+	model, err := getVncServer(item)
+	if err != nil {
+		return "", fmt.Errorf("GetVNC: failed to get domain data: %v", err)
+	}
+	return model, nil
+
+}
+
+func (s *VirtioService) SetVNCPassword(name, password string) error {
+
+	log.Printf("SetVNCPassword: Connecting libvirt to %s", s.system)
+	conn, err := libvirt.NewConnect(s.system)
+	if err != nil {
+		return fmt.Errorf("SetVNCPassword: failed to connect to libvirt: %v", err)
+	}
+	defer conn.Close()
+
+	item, err := conn.LookupDomainByName(name)
+	if err != nil {
+		libvirtError, ok := err.(libvirt.Error)
+		if ok && libvirtError.Code == libvirt.ERR_NO_DOMAIN {
+			return fmt.Errorf("SetVNCPassword: Failed to find the domain: %s: Not Found", name)
+		} else {
+			return fmt.Errorf("SetVNCPassword: Failed to find the domain: %s: %v", name, err)
+		}
+	}
+	if item == nil {
+		return fmt.Errorf("SetVNCPassword: Failed to find the domain by name: %s", name)
+	}
+	defer item.Free()
+
+	err = changeVNCPassword(item, password)
+	if err != nil {
+		return fmt.Errorf("SetVNCPassword: failed to set VNC password: %v", err)
+	}
+	return nil
+}
+
 var _ ServerService = &VirtioService{}
+
+// DomainXMLForVNC represents the structure of the domain's XML we're interested in
+type DomainXMLForVNC struct {
+	Devices struct {
+		Graphics struct {
+			Type            string `xml:"type,attr"`
+			Autoport        string `xml:"autoport,attr"`
+			SharePolicy     string `xml:"sharePolicy,attr"`
+			Keymap          string `xml:"keymap,attr"`
+			Listen          string `xml:"listen,attr"`
+			Port            int    `xml:"port,attr"`
+			Websocket       int    `xml:"websocket,attr"`
+			PowerControl    string `xml:"powerControl,attr"`
+			Password        string `xml:"passwd,attr"`
+			Connected       string `xml:"connected,attr"`
+			Socket          string `xml:"socket,attr"`
+			PasswordValidTo string `xml:"passwdValidTo,attr"`
+		} `xml:"graphics"`
+	} `xml:"devices"`
+}
+
+func getVncServer(item *libvirt.Domain) (string, error) {
+
+	// Get the XML description of the domain
+	xmlDesc, err := item.GetXMLDesc(0)
+	if err != nil {
+		return "", fmt.Errorf("getVncServer: failed to get domain XML: %v", err)
+	}
+
+	// Parse the XML to extract VNC information
+	var domainXML DomainXMLForVNC
+	if err := xml.Unmarshal([]byte(xmlDesc), &domainXML); err != nil {
+		return "", fmt.Errorf("getVncServer: failed to unmarshal domain XML: %v", err)
+	}
+
+	// Check if the graphics type is VNC and print the details
+	if domainXML.Devices.Graphics.Type != "vnc" {
+		return "", fmt.Errorf("getVncServer: No VNC configuration found.")
+	}
+
+	return fmt.Sprintf("%s:%d", domainXML.Devices.Graphics.Listen, domainXML.Devices.Graphics.Port), nil
+}
 
 func getServerModel(item *libvirt.Domain) (*ServerModel, error) {
 	state, _, err := item.GetState()
@@ -537,6 +641,33 @@ func gracefulRestart(domain *libvirt.Domain, domainName string) {
 		return
 	}
 	log.Printf("gracefulRestart: Domain '%s' restarted successfully", domainName)
+}
+
+func changeVNCPassword(domain *libvirt.Domain, newPassword string) error {
+
+	// Get the XML description of the domain
+	xmlDesc, err := domain.GetXMLDesc(0)
+	if err != nil {
+		return fmt.Errorf("changeVNCPassword: failed to get domain XML: %v", err)
+	}
+
+	// Parse the XML to extract VNC information
+	var domainXML DomainXMLForVNC
+	if err := xml.Unmarshal([]byte(xmlDesc), &domainXML); err != nil {
+		return fmt.Errorf("changeVNCPassword: failed to unmarshal domain XML: %v", err)
+	}
+
+	partialXML := fmt.Sprintf(`
+      <graphics type='vnc' listen='%s' passwd='%s' port='%d' autoport='%s' />
+`, domainXML.Devices.Graphics.Listen, newPassword, domainXML.Devices.Graphics.Port, domainXML.Devices.Graphics.Autoport)
+
+	err = domain.UpdateDeviceFlags(partialXML, libvirt.DOMAIN_DEVICE_MODIFY_CONFIG|libvirt.DOMAIN_DEVICE_MODIFY_CURRENT|libvirt.DOMAIN_DEVICE_MODIFY_LIVE)
+	if err != nil {
+		return fmt.Errorf("changeVNCPassword: failed to update domain configuration: %v", err)
+	}
+
+	log.Printf("changeVNCPassword: VNC password for domain changed successfully: %s", newPassword)
+	return nil
 }
 
 func copyImageFile(sourcePath, destinationFile string) error {

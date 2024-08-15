@@ -13,4 +13,6 @@ type ServerService interface {
 	StopServer(name string) (*ServerModel, error)
 	RestartServer(name string) (*ServerModel, error)
 	DeleteServer(name string) (*ServerModel, error)
+	GetVNC(name string) (string, error)
+	SetVNCPassword(name, password string) error
 }

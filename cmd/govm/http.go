@@ -19,6 +19,7 @@ type ApiServer struct {
 	listen                    string
 	authenticatedSessionToken string
 	service                   ServerService
+	vncSessions               map[string]string
 }
 
 func NewApiServer(listen string, service ServerService) *ApiServer {
@@ -26,6 +27,7 @@ func NewApiServer(listen string, service ServerService) *ApiServer {
 		listen:                    listen,
 		authenticatedSessionToken: "",
 		service:                   service,
+		vncSessions:               make(map[string]string),
 	}
 }
 
@@ -316,10 +318,17 @@ func (api *ApiServer) startApiServer() error {
 	api.r = mux.NewRouter()
 
 	// Wrap the file server onr to track requests using Prometheus
-	fileServerHandler := http.FileServer(http.FS(frontend.BuildFS))
+	fileServerHandler := http.FileServer(http.FS(frontend.BuildFrontend))
 	wrappedFileServerHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		logRequest("wrappedFileServerHandler", r)
 		fileServerHandler.ServeHTTP(w, r)
+	})
+
+	// Wrap the file server onr to track requests using Prometheus
+	novncFileServerHandler := http.FileServer(http.FS(frontend.BuildNoVNC))
+	novncWrappedFileServerHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		logRequest("novncWrappedFileServerHandler", r)
+		novncFileServerHandler.ServeHTTP(w, r)
 	})
 
 	api.r.HandleFunc("/api/v1", api.onIndexRequest).Methods("GET")
@@ -332,7 +341,11 @@ func (api *ApiServer) startApiServer() error {
 	api.r.HandleFunc("/api/v1/servers/{name}/stop", api.onServerStopRequest).Methods("GET", "POST")
 	api.r.HandleFunc("/api/v1/servers/{name}/restart", api.onServerRestartRequest).Methods("GET", "POST")
 	api.r.HandleFunc("/api/v1/servers/{name}/delete", api.onServerDeleteRequest).Methods("GET", "POST")
+	api.r.HandleFunc("/api/v1/servers/{name}/vnc", api.onVncOpen).Methods("GET", "POST")
+	api.r.HandleFunc("/api/vnc/{token}", api.onVncClose).Methods("DELETE")
+	api.r.HandleFunc("/api/vnc/{token}", api.onVncWebSocket)
 	api.r.Handle("/metrics", promhttp.Handler())
+	api.r.PathPrefix("/api/novnc/").Handler(http.StripPrefix("/api/novnc/", novncWrappedFileServerHandler))
 	api.r.PathPrefix("/").Handler(http.StripPrefix("/", wrappedFileServerHandler))
 
 	err := http.ListenAndServe(api.listen, api.r)

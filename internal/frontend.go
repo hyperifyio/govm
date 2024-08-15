@@ -5,22 +5,31 @@ package frontend
 import (
 	"embed"
 	"io/fs"
+	"log"
 )
 
 //go:embed frontend-govm/build
-var FrontendFS embed.FS
+var webContent embed.FS
+var BuildFrontend fs.FS
 
-var BuildFS fs.FS
+//go:embed frontend-novnc/vnc.html frontend-novnc/vnc_lite.html frontend-novnc/package.json frontend-novnc/app/* frontend-novnc/core/* frontend-novnc/vendor/*
+var novncWebContent embed.FS
+var BuildNoVNC fs.FS
 
 func init() {
 
 	var err error
 
-	// Create a subdirectory in the filesystem.
-	// This assumes your files are located at 'frontend-govm/build' in the embedded filesystem.
-	BuildFS, err = fs.Sub(FrontendFS, "frontend-govm/build")
+	// Our frontend
+	BuildFrontend, err = fs.Sub(webContent, "frontend-govm/build")
 	if err != nil {
-		panic(err) // Or handle the error as appropriate
+		log.Fatalf("Frontend initialization failed: %v", err)
+	}
+
+	// NoVNC source codes
+	BuildNoVNC, err = fs.Sub(novncWebContent, "frontend-novnc")
+	if err != nil {
+		log.Fatalf("NoVNC initialization failed: %v", err)
 	}
 
 }

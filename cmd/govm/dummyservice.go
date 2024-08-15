@@ -47,6 +47,14 @@ func (s *DummyService) FindServer(name string) (*ServerModel, error) {
 	return nil, nil
 }
 
+func (s *DummyService) GetVNC(name string) (string, error) {
+	return "127.0.0.1:5900", nil
+}
+
+func (s *DummyService) SetVNCPassword(name, password string) error {
+	return nil
+}
+
 func (s *DummyService) DeployServer(name string) (*ServerModel, error) {
 	server, err := s.FindServer(name)
 	if err != nil {
