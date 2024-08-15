@@ -23,6 +23,7 @@ func main() {
 	system := flag.String("system", parseStringEnv("GOVM_SYSTEM", "qemu:///system"), "change default virtio system")
 	ifType := flag.String("default-if", parseStringEnv("GOVM_INTERFACE_TYPE", "network"), "change default virtio interface type (user or network)")
 	ifNetworkName := flag.String("default-if-network", parseStringEnv("GOVM_INTERFACE_NETWORK", "default"), "change default virtio network name (if network type)")
+	defaultBridge := flag.String("default-bridge", parseStringEnv("GOVM_BRIDGE", "br0"), "change default virtio network bridge interface")
 	volumesDir := flag.String("volumes", parseStringEnv("GOVM_VOLUMES", "./volumes"), "change default location for volumes")
 	imagesDir := flag.String("images", parseStringEnv("GOVM_IMAGES", "./images"), "change default location for images")
 	adminEmail := flag.String("admin-email", parseStringEnv("GOVM_ADMIN_EMAIL", ""), "change default admin email address")
@@ -77,7 +78,7 @@ func main() {
 			log.Fatalf("Failed to get absolute path for volumes directory: %s: %v", *volumesDir, err)
 		}
 
-		service = NewVirtioService(*system, absImagesDir, absVolumesDir, *ifType, *ifNetworkName)
+		service = NewVirtioService(*system, absImagesDir, absVolumesDir, *ifType, *ifNetworkName, *defaultBridge)
 		log.Printf("Starting virtio server at %s\n", listenTo)
 	}
 

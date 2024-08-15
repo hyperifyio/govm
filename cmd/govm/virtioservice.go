@@ -4,8 +4,6 @@ package main
 
 import (
 	"crypto/rand"
-	"crypto/sha512"
-	"encoding/base64"
 	"fmt"
 	"io"
 	"log"
@@ -17,7 +15,7 @@ import (
 	disk2 "github.com/diskfs/go-diskfs/disk"
 	"github.com/diskfs/go-diskfs/filesystem"
 	"github.com/diskfs/go-diskfs/filesystem/iso9660"
-	"golang.org/x/crypto/pbkdf2"
+	"github.com/tredoe/osutil/user/crypt/sha512_crypt"
 	"libvirt.org/go/libvirt"
 )
 
@@ -27,10 +25,11 @@ type VirtioService struct {
 	volumesPath    string
 	interfaceType  string
 	defaultNetwork string
+	defaultBridge  string
 }
 
 func NewVirtioService(
-	system, imagesPath, volumesPath, interfaceType, defaultNetwork string,
+	system, imagesPath, volumesPath, interfaceType, defaultNetwork, defaultBridge string,
 ) *VirtioService {
 	return &VirtioService{
 		system:         system,
@@ -38,6 +37,7 @@ func NewVirtioService(
 		volumesPath:    volumesPath,
 		interfaceType:  interfaceType,
 		defaultNetwork: defaultNetwork,
+		defaultBridge:  defaultBridge,
 	}
 }
 
@@ -77,60 +77,76 @@ func (s *VirtioService) AddServer(
 	const memory string = "1048576"
 	const vcpu string = "1"
 	const domainOsArchType string = "x86_64"
-	const imageArch string = "amd64"
+
 	const machine string = "pc-i440fx-9.0"
 	const osType string = "hvm"
 	const bootDev string = "hd"
+
+	const imageArch string = "amd64"
 	const imageType string = "qcow2"
+
 	const vncPort string = "-1"
 	const vncListen string = "127.0.0.1"
+
 	const username string = "admin"
 	const diskDevice string = "vda"
+
 	const networkAddress string = "192.168.123.2"
 	const networkGateway string = "192.168.123.1"
-	const networkNetmask string = "255.255.255.0"
 	const networkPrefix string = "24"
 
-	// TODO: Generate new mac
-	const macAddress string = "52:54:00:6b:3c:58"
-
 	log.Printf("AddServer: Network address is %s/%s", networkAddress, networkPrefix)
+
+	macAddress, err := generateRandomMAC()
+	if err != nil {
+		return nil, fmt.Errorf("AddServer: failed to generate new mac: %v", err)
+	}
+	log.Printf("AddServer: MAC is %s", macAddress)
+
+	networkNetmask, err := getNetmask(networkPrefix)
+	if err != nil {
+		return nil, fmt.Errorf("AddServer: failed to parse netmask: %s: %v", networkPrefix, err)
+	}
+	log.Printf("AddServer: Netmask is %s", networkNetmask)
 
 	vncPassword, err := generatePassword(8)
 	if err != nil {
 		return nil, fmt.Errorf("AddServer: failed to generate vnc password: %v", err)
 	}
-	log.Printf("AddServer: Created VNC with password %s", vncPassword)
+	log.Printf("AddServer: VNC with password %s", vncPassword)
 
 	userPassword, err := generatePassword(12)
 	if err != nil {
 		return nil, fmt.Errorf("AddServer: failed to generate user password: %v", err)
 	}
-	log.Printf("AddServer: Created user %s with password %s", username, userPassword)
+	log.Printf("AddServer: User %s with password %s", username, userPassword)
 
-	passwordSalt, err := generateSalt()
-	if err != nil {
-		return nil, fmt.Errorf("AddServer: failed to generate password salt: %v", err)
-	}
-
-	encryptedPassword, err := encryptPassword(userPassword, passwordSalt)
+	encryptedPassword, err := encryptPassword(userPassword)
 	if err != nil {
 		return nil, fmt.Errorf("AddServer: failed to encrypt password: %v", err)
 	}
 
 	interfaceType := s.interfaceType
+	log.Printf("AddServer: Network type is %s", interfaceType)
 
 	imageFile := s.imagesPath + "/debian-12-genericcloud-" + imageArch + "." + imageType
 	diskFile := s.volumesPath + "/" + name + "/" + name + "-" + diskDevice + "." + imageType
 	ciDataFile := s.volumesPath + "/" + name + "/" + name + "-cidata.iso"
 
 	// Copy the image to the destination directory
-	destinationImagePath, err := copyImageFile(imageFile, diskFile)
-	if err != nil {
-		return nil, fmt.Errorf("AddServer: failed to copy image file: %v", err)
-	}
 
-	log.Printf("Image file copied to: %s", destinationImagePath)
+	_, err = os.Stat(diskFile)
+	if err == nil {
+		log.Printf("Warning! Using existing image file: %s", diskFile)
+	} else if os.IsNotExist(err) {
+		err = copyImageFile(imageFile, diskFile)
+		if err != nil {
+			return nil, fmt.Errorf("AddServer: failed to copy image file: %v", err)
+		}
+		log.Printf("Image file copied to: %s", diskFile)
+	} else {
+		return nil, fmt.Errorf("AddServer: failed to stat image file: %v", err)
+	}
 
 	var interfaceXML string = ""
 	if interfaceType == "network" {
@@ -140,6 +156,19 @@ func (s *VirtioService) AddServer(
       <mac address='` + macAddress + `'/>
       <source network='` + ifSourceNetwork + `'/>
       <model type='virtio'/>
+      <address type='pci' domain='0x0000' bus='0x00' slot='0x03' function='0x0'/>
+    </interface>`
+	} else if interfaceType == "bridge" {
+		bridgeInterface := s.defaultBridge
+		interfaceXML = `<interface type='bridge'>
+      <mac address='` + macAddress + `'/>
+      <source bridge='` + bridgeInterface + `'/>
+      <bandwidth>
+        <inbound average='125000'/>
+        <outbound average='125000'/>
+      </bandwidth>
+      <model type='virtio'/>
+      <alias name='net0'/>
       <address type='pci' domain='0x0000' bus='0x00' slot='0x03' function='0x0'/>
     </interface>`
 	} else if interfaceType == "user" {
@@ -176,6 +205,22 @@ func (s *VirtioService) AddServer(
     <type arch='` + domainOsArchType + `' machine='` + machine + `'>` + osType + `</type>
     <boot dev='` + bootDev + `'/>
   </os>
+  <features>
+    <acpi/>
+    <apic/>
+  </features>
+  <clock offset='utc'>
+    <timer name='rtc' tickpolicy='catchup'/>
+    <timer name='pit' tickpolicy='delay'/>
+    <timer name='hpet' present='no'/>
+  </clock>
+  <on_poweroff>destroy</on_poweroff>
+  <on_reboot>restart</on_reboot>
+  <on_crash>destroy</on_crash>
+  <pm>
+    <suspend-to-mem enabled='no'/>
+    <suspend-to-disk enabled='no'/>
+  </pm>
   <devices>
 ` + diskXML + `
 ` + cloudInitXML + `
@@ -192,12 +237,12 @@ local-hostname: ` + name
 users:
   - name: ` + username + `
     passwd: ` + encryptedPassword + `
+    lock_passwd: false
     sudo: ['ALL=(ALL) NOPASSWD:ALL']
     groups: sudo
     shell: /bin/bash`
 
-	networkConfig := `
-version: 2
+	networkConfig := `version: 2
 ethernets:
   interface0:
     match:
@@ -494,33 +539,33 @@ func gracefulRestart(domain *libvirt.Domain, domainName string) {
 	log.Printf("gracefulRestart: Domain '%s' restarted successfully", domainName)
 }
 
-func copyImageFile(sourcePath, destinationFile string) (string, error) {
+func copyImageFile(sourcePath, destinationFile string) error {
 
 	destinationDir := filepath.Dir(destinationFile)
 	destinationBasename := filepath.Base(destinationFile)
 	destinationPath := filepath.Join(destinationDir, destinationBasename)
 
 	if err := os.MkdirAll(destinationDir, 0700); err != nil {
-		return "", fmt.Errorf("failed to create destination directory: %w", err)
+		return fmt.Errorf("failed to create destination directory: %w", err)
 	}
 
 	sourceFile, err := os.Open(sourcePath)
 	if err != nil {
-		return "", fmt.Errorf("failed to open source image: %w", err)
+		return fmt.Errorf("failed to open source image: %w", err)
 	}
 	defer sourceFile.Close()
 
 	destFile, err := os.Create(destinationPath)
 	if err != nil {
-		return "", fmt.Errorf("failed to create image: %w", err)
+		return fmt.Errorf("failed to create image: %w", err)
 	}
 	defer destFile.Close()
 
 	if _, err := io.Copy(destFile, sourceFile); err != nil {
-		return "", fmt.Errorf("failed to copy image: %w", err)
+		return fmt.Errorf("failed to copy image: %w", err)
 	}
 
-	return destinationPath, nil
+	return nil
 }
 
 func createCloudInitISO(isoPath, metaData, userData, networkConfig string) error {
@@ -577,18 +622,92 @@ func createCloudInitISO(isoPath, metaData, userData, networkConfig string) error
 	return nil
 }
 
-func generateSalt() (string, error) {
-	salt := make([]byte, 16) // 16 bytes salt for SHA-512 crypt
-	_, err := rand.Read(salt)
+func encryptPassword(password string) (string, error) {
+	s, err := generatePassword(8)
 	if err != nil {
-		return "", fmt.Errorf("failed to generate salt: %v", err)
+		return "", fmt.Errorf("encryptPassword: salt generation failed: %v", err)
 	}
-	return base64.RawStdEncoding.EncodeToString(salt), nil
+	saltString := fmt.Sprintf("$6$%s", s)
+	salt := []byte(saltString)
+	c := sha512_crypt.New()
+	hash, err := c.Generate([]byte(password), salt)
+	if err != nil {
+		return "", fmt.Errorf("encryptPassword: failed: %v", err)
+	}
+	return string(hash), nil
 }
 
-func encryptPassword(password, salt string) (string, error) {
-	// Use pbkdf2 to hash the password with SHA-512
-	hash := pbkdf2.Key([]byte(password), []byte(salt), 10000, sha512.Size, sha512.New)
-	// Format it into the required $6$<salt>$<hash> format
-	return fmt.Sprintf("$6$%s$%s", salt, base64.RawStdEncoding.EncodeToString(hash)), nil
+func getNetmask(prefix string) (string, error) {
+	switch prefix {
+	case "8":
+		return "255.0.0.0", nil
+	case "9":
+		return "255.128.0.0", nil
+	case "10":
+		return "255.192.0.0", nil
+	case "11":
+		return "255.224.0.0", nil
+	case "12":
+		return "255.240.0.0", nil
+	case "13":
+		return "255.248.0.0", nil
+	case "14":
+		return "255.252.0.0", nil
+	case "15":
+		return "255.254.0.0", nil
+	case "16":
+		return "255.255.0.0", nil
+	case "17":
+		return "255.255.128.0", nil
+	case "18":
+		return "255.255.192.0", nil
+	case "19":
+		return "255.255.224.0", nil
+	case "20":
+		return "255.255.240.0", nil
+	case "21":
+		return "255.255.248.0", nil
+	case "22":
+		return "255.255.252.0", nil
+	case "23":
+		return "255.255.254.0", nil
+	case "24":
+		return "255.255.255.0", nil
+	case "25":
+		return "255.255.255.128", nil
+	case "26":
+		return "255.255.255.192", nil
+	case "27":
+		return "255.255.255.224", nil
+	case "28":
+		return "255.255.255.240", nil
+	case "29":
+		return "255.255.255.248", nil
+	case "30":
+		return "255.255.255.252", nil
+	case "31":
+		return "255.255.255.254", nil
+	case "32":
+		return "255.255.255.255", nil
+	}
+	return "", fmt.Errorf("getNetmask: failed to parse netmask: %s", prefix)
+}
+
+func generateRandomMAC() (string, error) {
+
+	// 02:00:00 is a common prefix for locally administered MAC addresses
+	prefix := []byte{0x02, 0x00, 0x00}
+
+	// Generate the remaining 3 bytes randomly
+	mac := make([]byte, 6)
+	if _, err := rand.Read(mac[3:]); err != nil {
+		return "", fmt.Errorf("failed to generate random MAC address: %v", err)
+	}
+
+	// Combine the prefix with the random bytes
+	copy(mac[:3], prefix)
+
+	// Format the MAC address
+	return fmt.Sprintf("%02x:%02x:%02x:%02x:%02x:%02x",
+		mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]), nil
 }
