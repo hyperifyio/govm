@@ -27,10 +27,20 @@ type VirtioService struct {
 	interfaceType  string
 	defaultNetwork string
 	defaultBridge  string
+	enabledActions []ServerActionCode
+	createEnabled  bool
+	deployEnabled  bool
+	startEnabled   bool
+	stopEnabled    bool
+	restartEnabled bool
+	deleteEnabled  bool
+	consoleEnabled bool
 }
 
+// NewVirtioService -- Initiate the service
 func NewVirtioService(
 	system, imagesPath, volumesPath, interfaceType, defaultNetwork, defaultBridge string,
+	enabledActions []ServerActionCode,
 ) *VirtioService {
 	return &VirtioService{
 		system:         system,
@@ -39,9 +49,18 @@ func NewVirtioService(
 		interfaceType:  interfaceType,
 		defaultNetwork: defaultNetwork,
 		defaultBridge:  defaultBridge,
+		enabledActions: enabledActions,
+		createEnabled:  HasServerActionCode(enabledActions, CreateServerActionCode),
+		deployEnabled:  HasServerActionCode(enabledActions, DeployServerActionCode),
+		startEnabled:   HasServerActionCode(enabledActions, StartServerActionCode),
+		stopEnabled:    HasServerActionCode(enabledActions, StopServerActionCode),
+		restartEnabled: HasServerActionCode(enabledActions, RestartServerActionCode),
+		deleteEnabled:  HasServerActionCode(enabledActions, DeleteServerActionCode),
+		consoleEnabled: HasServerActionCode(enabledActions, ConsoleServerActionCode),
 	}
 }
 
+// Start the service
 func (s *VirtioService) Start() error {
 	log.Printf("Start: Connecting libvirt to %s", s.system)
 	conn, err := libvirt.NewConnect(s.system)
@@ -57,14 +76,18 @@ func (s *VirtioService) Start() error {
 	return nil
 }
 
+// Stop the service
 func (s *VirtioService) Stop() error {
 	return nil
 }
 
+// AddServer -- Creates a new virtual server
 func (s *VirtioService) AddServer(
 	name string,
 ) (*ServerModel, error) {
-
+	if !s.createEnabled {
+		return nil, fmt.Errorf("AddServer: Not enabled")
+	}
 	fmt.Println("AddServer: Connecting to libvirt to add domain: ", name)
 
 	// Connect to the local libvirt daemon
@@ -262,13 +285,13 @@ ethernets:
 	log.Printf("Cloud-Init ISO created successfully at %s", ciDataFile)
 
 	// Create the domain
-	domain, err := conn.DomainDefineXML(domainXML)
+	item, err := conn.DomainDefineXML(domainXML)
 	if err != nil {
 		return nil, fmt.Errorf("AddServer: failed to define domain: %v", err)
 	}
-	defer domain.Free()
+	defer item.Free()
 
-	model, err := getServerModel(domain)
+	model, err := getServerModel(item, s.enabledActions)
 	if err != nil {
 		return nil, fmt.Errorf("AddServer: failed to get domain data: %v", err)
 	}
@@ -277,6 +300,7 @@ ethernets:
 	return model, nil
 }
 
+// GetServerList returns the server list
 func (s *VirtioService) GetServerList() ([]*ServerModel, error) {
 	var servers []*ServerModel
 	log.Printf("GetServerList: Connecting libvirt to %s", s.system)
@@ -291,7 +315,7 @@ func (s *VirtioService) GetServerList() ([]*ServerModel, error) {
 	}
 	for _, item := range list {
 		defer item.Free()
-		model, err := getServerModel(&item)
+		model, err := getServerModel(&item, s.enabledActions)
 		if err != nil {
 			return nil, fmt.Errorf("AddServer: failed to get domain data: %v", err)
 		}
@@ -300,6 +324,7 @@ func (s *VirtioService) GetServerList() ([]*ServerModel, error) {
 	return servers, nil
 }
 
+// FindServer finds a server
 func (s *VirtioService) FindServer(targetName string) (*ServerModel, error) {
 
 	log.Printf("FindServer: Connecting libvirt to %s", s.system)
@@ -323,7 +348,7 @@ func (s *VirtioService) FindServer(targetName string) (*ServerModel, error) {
 	}
 	defer item.Free()
 
-	model, err := getServerModel(item)
+	model, err := getServerModel(item, s.enabledActions)
 	if err != nil {
 		return nil, fmt.Errorf("FindServer: failed to get domain data: %v", err)
 	}
@@ -331,7 +356,11 @@ func (s *VirtioService) FindServer(targetName string) (*ServerModel, error) {
 
 }
 
+// DeployServer deploys the server
 func (s *VirtioService) DeployServer(name string) (*ServerModel, error) {
+	if !s.deployEnabled {
+		return nil, fmt.Errorf("DeployServer: Not enabled")
+	}
 	server, err := s.FindServer(name)
 	if err != nil {
 		return nil, fmt.Errorf("DeployServer: failed to find the server: error: %v", err)
@@ -348,7 +377,11 @@ func (s *VirtioService) DeployServer(name string) (*ServerModel, error) {
 	return server, nil
 }
 
+// StartServer starts the server
 func (s *VirtioService) StartServer(name string) (*ServerModel, error) {
+	if !s.startEnabled {
+		return nil, fmt.Errorf("StartServer: Not enabled")
+	}
 
 	log.Printf("StartServer: Connecting libvirt to %s", s.system)
 	conn, err := libvirt.NewConnect(s.system)
@@ -372,14 +405,18 @@ func (s *VirtioService) StartServer(name string) (*ServerModel, error) {
 	}
 	defer item.Free()
 
-	model, err := getServerModel(item)
+	model, err := getServerModel(item, s.enabledActions)
 	if err != nil {
 		return nil, fmt.Errorf("StartServer: failed to get domain data: %v", err)
 	}
 	return model, nil
 }
 
+// StopServer stops the server
 func (s *VirtioService) StopServer(name string) (*ServerModel, error) {
+	if !s.stopEnabled {
+		return nil, fmt.Errorf("StopServer: Not enabled")
+	}
 
 	log.Printf("StopServer: Connecting libvirt to %s", s.system)
 	conn, err := libvirt.NewConnect(s.system)
@@ -403,14 +440,18 @@ func (s *VirtioService) StopServer(name string) (*ServerModel, error) {
 	}
 	defer item.Free()
 
-	model, err := getServerModel(item)
+	model, err := getServerModel(item, s.enabledActions)
 	if err != nil {
 		return nil, fmt.Errorf("StopServer: failed to get domain data: %v", err)
 	}
 	return model, nil
 }
 
+// RestartServer restart the server
 func (s *VirtioService) RestartServer(name string) (*ServerModel, error) {
+	if !(s.restartEnabled && s.startEnabled && s.stopEnabled) {
+		return nil, fmt.Errorf("RestartServer: Not enabled")
+	}
 
 	log.Printf("RestartServer: Connecting libvirt to %s", s.system)
 	conn, err := libvirt.NewConnect(s.system)
@@ -430,14 +471,18 @@ func (s *VirtioService) RestartServer(name string) (*ServerModel, error) {
 
 	go gracefulRestart(item, name)
 
-	model, err := getServerModel(item)
+	model, err := getServerModel(item, s.enabledActions)
 	if err != nil {
 		return nil, fmt.Errorf("RestartServer: failed to get domain data: %v", err)
 	}
 	return model, nil
 }
 
+// DeleteServer delete the server
 func (s *VirtioService) DeleteServer(name string) (*ServerModel, error) {
+	if !s.deleteEnabled {
+		return nil, fmt.Errorf("DeleteServer: Not enabled")
+	}
 
 	log.Printf("DeleteServer: Connecting libvirt to %s", s.system)
 	conn, err := libvirt.NewConnect(s.system)
@@ -455,7 +500,7 @@ func (s *VirtioService) DeleteServer(name string) (*ServerModel, error) {
 	}
 	defer item.Free()
 
-	model, err := getServerModel(item)
+	model, err := getServerModel(item, s.enabledActions)
 	if err != nil {
 		return nil, fmt.Errorf("DeleteServer: failed to get domain data: %v", err)
 	}
@@ -470,7 +515,11 @@ func (s *VirtioService) DeleteServer(name string) (*ServerModel, error) {
 	return model, nil
 }
 
+// GetVNC returns the VNC console
 func (s *VirtioService) GetVNC(name string) (string, error) {
+	if !s.consoleEnabled {
+		return "", fmt.Errorf("GetVNC: Console not enabled")
+	}
 
 	log.Printf("GetVNC: Connecting libvirt to %s", s.system)
 	conn, err := libvirt.NewConnect(s.system)
@@ -501,7 +550,11 @@ func (s *VirtioService) GetVNC(name string) (string, error) {
 
 }
 
+// SetVNCPassword sets the VNC server password
 func (s *VirtioService) SetVNCPassword(name, password string) error {
+	if !s.consoleEnabled {
+		return fmt.Errorf("SetVNCPassword: Console not enabled")
+	}
 
 	log.Printf("SetVNCPassword: Connecting libvirt to %s", s.system)
 	conn, err := libvirt.NewConnect(s.system)
@@ -575,7 +628,10 @@ func getVncServer(item *libvirt.Domain) (string, error) {
 	return fmt.Sprintf("%s:%d", domainXML.Devices.Graphics.Listen, domainXML.Devices.Graphics.Port), nil
 }
 
-func getServerModel(item *libvirt.Domain) (*ServerModel, error) {
+func getServerModel(
+	item *libvirt.Domain,
+	enabledActions ServerActionCodeList,
+) (*ServerModel, error) {
 	state, _, err := item.GetState()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get domain state: %v", err)
@@ -584,7 +640,7 @@ func getServerModel(item *libvirt.Domain) (*ServerModel, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to get domain name: %v", err)
 	}
-	return NewServerModel(name, domainStateToServerStatusCode(state)), nil
+	return NewServerModel(name, domainStateToServerStatusCode(state), enabledActions), nil
 }
 
 func domainStateToServerStatusCode(state libvirt.DomainState) ServerStatusCode {

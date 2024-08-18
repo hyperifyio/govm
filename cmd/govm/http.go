@@ -15,39 +15,49 @@ import (
 )
 
 type ApiServer struct {
-	r                         *mux.Router
-	listen                    string
-	authenticatedSessionToken string
-	service                   ServerService
-	vncSessions               map[string]string
+	r                          *mux.Router
+	listen                     string
+	authenticatedSessionToken  string
+	service                    ServerService
+	vncSessions                map[string]string
+	enabledActions             []ServerActionCode
+	permissions                ServerPermissionDTO
+	unauthenticatedPermissions ServerPermissionDTO
 }
 
-func NewApiServer(listen string, service ServerService) *ApiServer {
+func NewApiServer(
+	listen string,
+	service ServerService,
+	enabledActions []ServerActionCode,
+) *ApiServer {
 	return &ApiServer{
-		listen:                    listen,
-		authenticatedSessionToken: "",
-		service:                   service,
-		vncSessions:               make(map[string]string),
+		listen:                     listen,
+		authenticatedSessionToken:  "",
+		service:                    service,
+		vncSessions:                make(map[string]string),
+		enabledActions:             enabledActions,
+		permissions:                NewServerPermissionDTOFromServerActionCodeList(enabledActions),
+		unauthenticatedPermissions: NewServerPermissionDTOFromServerActionCodeList(nil),
 	}
 }
 
 func (api *ApiServer) onIndexRequest(w http.ResponseWriter, r *http.Request) {
 	logRequest("onIndexRequest", r)
 	isValidSession := api.authenticateSession(r)
-
 	var response IndexDTO
 	if isValidSession {
 		response = IndexDTO{
 			Email:           ServerAdminEmail,
 			IsAuthenticated: true,
+			Permissions:     api.permissions,
 		}
 	} else {
 		response = IndexDTO{
 			Email:           "",
 			IsAuthenticated: false,
+			Permissions:     api.unauthenticatedPermissions,
 		}
 	}
-
 	sendJsonData("onIndexRequest", w, response)
 }
 
@@ -89,7 +99,7 @@ func (api *ApiServer) onAddServerRequest(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	response := ToServerListDTO(serverList)
+	response := ToServerListDTO(serverList, api.permissions)
 	sendJsonData("onAddServerRequest", w, response)
 }
 
@@ -109,7 +119,7 @@ func (api *ApiServer) onServerListRequest(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	response := ToServerListDTO(serverList)
+	response := ToServerListDTO(serverList, api.permissions)
 	sendJsonData("onServerListRequest", w, response)
 
 }

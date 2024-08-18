@@ -15,26 +15,32 @@ type ServerModel struct {
 
 	// Status the status of the server
 	Status ServerStatusCode
+
+	// EnabledActions
+	EnabledActions ServerActionCodeList
 }
 
 func NewServerModel(
 	name string,
 	status ServerStatusCode,
+	enabledActions ServerActionCodeList,
 ) *ServerModel {
 	if name == "" {
 		name = fmt.Sprintf("Server%d", rand.Intn(90000)+10000)
 	}
 	return &ServerModel{
-		Name:   name,
-		Status: status,
+		Name:           name,
+		Status:         status,
+		EnabledActions: enabledActions,
 	}
 }
 
 func (item *ServerModel) ToDTO() ServerDTO {
 	return ServerDTO{
-		Name:    item.Name,
-		Status:  item.Status.String(),
-		Actions: ToStatusStringList(item.Status.GetAvailableActions()),
+		Name:        item.Name,
+		Status:      item.Status.String(),
+		Actions:     ToStatusStringList(item.Status.GetAvailableActions(item.EnabledActions)),
+		Permissions: NewServerPermissionDTOFromServerActionCodeList(item.EnabledActions),
 	}
 }
 
@@ -50,9 +56,11 @@ func ToServerListArray(
 
 func ToServerListDTO(
 	list []*ServerModel,
+	permissions ServerPermissionDTO,
 ) ServerListDTO {
 	return ServerListDTO{
-		Payload: ToServerListArray(list),
+		Payload:     ToServerListArray(list),
+		Permissions: permissions,
 	}
 }
 

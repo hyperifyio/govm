@@ -43,6 +43,9 @@ type IndexDTO struct {
 
 	// Email address of the authenticated user
 	Email string `json:"email"`
+
+	// Permissions is permissions available to the user
+	Permissions ServerPermissionDTO `json:"permissions"`
 }
 
 // ServerDTO struct defines the structure of the response DTO returned from the server
@@ -56,6 +59,9 @@ type ServerDTO struct {
 
 	// Actions which are available to perform on the server
 	Actions []string `json:"actions"`
+
+	// Permissions is permissions available to the user
+	Permissions ServerPermissionDTO `json:"permissions"`
 }
 
 // CreateServerDTO defines the structure of the request body to deploy a new server
@@ -74,9 +80,8 @@ type ServerActionDTO struct {
 
 // ServerListDTO struct defines the structure of the response DTO returned from the server
 type ServerListDTO struct {
-
-	// Payload is
-	Payload []ServerDTO `json:"payload"`
+	Payload     []ServerDTO         `json:"payload"`
+	Permissions ServerPermissionDTO `json:"permissions"`
 }
 
 // ServerVncDTO defines an response to open a VNC console
@@ -93,4 +98,45 @@ type ServerVncDTO struct {
 
 	// Token is the VNC token
 	Token string `json:"token"`
+}
+
+type ServerPermissionDTO struct {
+	EnabledActions []ServerAction `json:"enabledActions"`
+	CreateEnabled  bool           `json:"createEnabled"`
+	DeployEnabled  bool           `json:"deployEnabled"`
+	StartEnabled   bool           `json:"startEnabled"`
+	StopEnabled    bool           `json:"stopEnabled"`
+	RestartEnabled bool           `json:"restartEnabled"`
+	DeleteEnabled  bool           `json:"deleteEnabled"`
+	ConsoleEnabled bool           `json:"consoleEnabled"`
+}
+
+func NewServerPermissionDTOFromServerActionList(
+	enabledActions []ServerAction,
+) ServerPermissionDTO {
+	return ServerPermissionDTO{
+		EnabledActions: enabledActions,
+		CreateEnabled:  HasServerAction(enabledActions, CreateServerAction),
+		DeployEnabled:  HasServerAction(enabledActions, DeployServerAction),
+		StartEnabled:   HasServerAction(enabledActions, StartServerAction),
+		StopEnabled:    HasServerAction(enabledActions, StopServerAction),
+		RestartEnabled: HasServerAction(enabledActions, RestartServerAction),
+		DeleteEnabled:  HasServerAction(enabledActions, DeleteServerAction),
+		ConsoleEnabled: HasServerAction(enabledActions, ConsoleServerAction),
+	}
+}
+
+func NewServerPermissionDTOFromServerActionCodeList(
+	enabledActions ServerActionCodeList,
+) ServerPermissionDTO {
+	return ServerPermissionDTO{
+		EnabledActions: enabledActions.ToServerAction(),
+		CreateEnabled:  HasServerActionCode(enabledActions, CreateServerActionCode),
+		DeployEnabled:  HasServerActionCode(enabledActions, DeployServerActionCode),
+		StartEnabled:   HasServerActionCode(enabledActions, StartServerActionCode),
+		StopEnabled:    HasServerActionCode(enabledActions, StopServerActionCode),
+		RestartEnabled: HasServerActionCode(enabledActions, RestartServerActionCode),
+		DeleteEnabled:  HasServerActionCode(enabledActions, DeleteServerActionCode),
+		ConsoleEnabled: HasServerActionCode(enabledActions, ConsoleServerActionCode),
+	}
 }

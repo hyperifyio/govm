@@ -59,16 +59,39 @@ func (d ServerStatusCode) String() string {
 	}[d]
 }
 
-func (d ServerStatusCode) GetAvailableActions() []ServerActionCode {
+func (d ServerStatusCode) GetAvailableActions(
+	enabledActions ServerActionCodeList,
+) []ServerActionCode {
+	var actions []ServerActionCode
 	switch d {
 	case UninitializedServerStatusCode:
-		return []ServerActionCode{DeployServerActionCode, DeleteServerActionCode}
+		if contains(enabledActions, DeployServerActionCode) {
+			actions = append(actions, DeployServerActionCode)
+		}
+		if contains(enabledActions, DeleteServerActionCode) {
+			actions = append(actions, DeleteServerActionCode)
+		}
+		break
 	case StoppedServerStatusCode:
-		return []ServerActionCode{StartServerActionCode, DeleteServerActionCode}
+		if contains(enabledActions, StartServerActionCode) {
+			actions = append(actions, StartServerActionCode)
+		}
+		if contains(enabledActions, DeleteServerActionCode) {
+			actions = append(actions, DeleteServerActionCode)
+		}
+		break
 	case StartedServerStatusCode:
-		return []ServerActionCode{StopServerActionCode, RestartServerActionCode}
+		if contains(enabledActions, StopServerActionCode) {
+			actions = append(actions, StopServerActionCode)
+			if contains(enabledActions, RestartServerActionCode) && contains(enabledActions, StartServerActionCode) {
+				actions = append(actions, RestartServerActionCode)
+			}
+		}
+		break
+	default:
+		break
 	}
-	return []ServerActionCode{}
+	return actions
 }
 
 // ParseServerStatusCode parses a string to ServerStatusCode

@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 
 	"govm"
 )
@@ -31,6 +32,7 @@ func main() {
 	port := flag.Int("port", parseIntEnv("PORT", 3001), "change default port")
 	version := flag.Bool("version", false, "Show version information")
 	demo := flag.Bool("demo", false, "Use demo version of the service")
+	features := flag.String("features", "start,stop,restart", "Enable server actions. Available actions are none, all, create, deploy, start, stop, restart, delete, and console.")
 
 	listenTo := fmt.Sprintf("%s:%d", *addr, *port)
 
@@ -62,6 +64,18 @@ func main() {
 		ServerAdminPassword = *adminPassword
 	}
 
+	// Features
+	var err any
+	var enabledActions []ServerActionCode
+	featuresList := strings.Split(*features, ",")
+	if contains(featuresList, "none") {
+	} else if contains(featuresList, "all") {
+		enabledActions = AllServerActionCodes()
+	} else {
+		enabledActions, err = ParseServerActionCodeList(featuresList)
+	}
+
+	// Service
 	var service ServerService
 	if *demo {
 		service = NewDummyService()
@@ -78,16 +92,16 @@ func main() {
 			log.Fatalf("Failed to get absolute path for volumes directory: %s: %v", *volumesDir, err)
 		}
 
-		service = NewVirtioService(*system, absImagesDir, absVolumesDir, *ifType, *ifNetworkName, *defaultBridge)
+		service = NewVirtioService(*system, absImagesDir, absVolumesDir, *ifType, *ifNetworkName, *defaultBridge, enabledActions)
 		log.Printf("Starting virtio server at %s\n", listenTo)
 	}
 
-	err := service.Start()
+	err = service.Start()
 	if err != nil {
 		log.Fatalf("Failed to start the service: %v", err)
 	}
 
-	server := NewApiServer(listenTo, service)
+	server := NewApiServer(listenTo, service, enabledActions)
 
 	err = server.startApiServer()
 	if err != nil {
@@ -119,4 +133,14 @@ func parseStringEnv(key string, defaultValue string) string {
 		return defaultValue
 	}
 	return str
+}
+
+// contains checks if a value exists in a slice of values
+func contains[T comparable](slice []T, item T) bool {
+	for _, s := range slice {
+		if s == item {
+			return true
+		}
+	}
+	return false
 }

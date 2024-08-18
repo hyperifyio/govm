@@ -1,6 +1,8 @@
 # @hyperifyio/govm
 
-Source code for govm project
+This is the source code for the GoVM Virtual Manager. It includes the server written in Go and a web frontend.
+
+For more information about the progress of the project, see [GoVM Project](https://github.com/hyperifyio/project-govm/issues/1).
 
 ## Clone 
 

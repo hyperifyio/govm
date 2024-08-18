@@ -9,7 +9,8 @@ import (
 )
 
 type DummyService struct {
-	servers []*ServerModel
+	servers        []*ServerModel
+	enabledActions []ServerActionCode
 }
 
 func NewDummyService() *DummyService {
@@ -29,7 +30,7 @@ func (s *DummyService) Stop() error {
 func (s *DummyService) AddServer(
 	name string,
 ) (*ServerModel, error) {
-	item := NewServerModel(name, UninitializedServerStatusCode)
+	item := NewServerModel(name, UninitializedServerStatusCode, s.enabledActions)
 	s.servers = append(s.servers, item)
 	return item, nil
 }
