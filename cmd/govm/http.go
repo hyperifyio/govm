@@ -4,9 +4,11 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
+	"strings"
 
 	"github.com/gorilla/mux"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -17,7 +19,8 @@ import (
 type ApiServer struct {
 	r                          *mux.Router
 	listen                     string
-	authenticatedSessionToken  string
+	authorization              AuthorizationService
+	session                    SessionService
 	service                    ServerService
 	vncSessions                map[string]string
 	enabledActions             []ServerActionCode
@@ -28,12 +31,15 @@ type ApiServer struct {
 func NewApiServer(
 	listen string,
 	service ServerService,
+	sessionService SessionService,
+	authorization AuthorizationService,
 	enabledActions []ServerActionCode,
 ) *ApiServer {
 	return &ApiServer{
 		listen:                     listen,
-		authenticatedSessionToken:  "",
+		session:                    sessionService,
 		service:                    service,
+		authorization:              authorization,
 		vncSessions:                make(map[string]string),
 		enabledActions:             enabledActions,
 		permissions:                NewServerPermissionDTOFromServerActionCodeList(enabledActions),
@@ -43,11 +49,11 @@ func NewApiServer(
 
 func (api *ApiServer) onIndexRequest(w http.ResponseWriter, r *http.Request) {
 	logRequest("onIndexRequest", r)
-	isValidSession := api.authenticateSession(r)
+	session := api.authenticateSession(r)
 	var response IndexDTO
-	if isValidSession {
+	if session != nil {
 		response = IndexDTO{
-			Email:           ServerAdminEmail,
+			Email:           session.Email,
 			IsAuthenticated: true,
 			Permissions:     api.permissions,
 		}
@@ -65,8 +71,8 @@ func (api *ApiServer) onAddServerRequest(w http.ResponseWriter, r *http.Request)
 
 	logRequest("onAddServerRequest", r)
 
-	isValidSession := api.authenticateSession(r)
-	if !isValidSession {
+	session := api.authenticateSession(r)
+	if session == nil {
 		sendJsonError("onAddServerRequest", w, UnauthorizedError, http.StatusUnauthorized)
 		return
 	}
@@ -107,8 +113,8 @@ func (api *ApiServer) onServerListRequest(w http.ResponseWriter, r *http.Request
 
 	logRequest("onServerListRequest", r)
 
-	isValidSession := api.authenticateSession(r)
-	if !isValidSession {
+	session := api.authenticateSession(r)
+	if session == nil {
 		sendJsonError("onServerListRequest", w, UnauthorizedError, http.StatusUnauthorized)
 		return
 	}
@@ -131,9 +137,8 @@ func (api *ApiServer) onServerRequest(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	name := vars["name"]
 
-	isValidSession := api.authenticateSession(r)
-
-	if !isValidSession {
+	session := api.authenticateSession(r)
+	if session == nil {
 		sendJsonError("onServerListRequest", w, UnauthorizedError, http.StatusUnauthorized)
 		return
 	}
@@ -160,8 +165,8 @@ func (api *ApiServer) onServerDeployRequest(w http.ResponseWriter, r *http.Reque
 	}
 	vars := mux.Vars(r)
 	name := vars["name"]
-	isValidSession := api.authenticateSession(r)
-	if !isValidSession {
+	session := api.authenticateSession(r)
+	if session == nil {
 		sendJsonError("onServerDeployRequest", w, UnauthorizedError, http.StatusUnauthorized)
 		return
 	}
@@ -186,8 +191,8 @@ func (api *ApiServer) onServerStartRequest(w http.ResponseWriter, r *http.Reques
 	}
 	vars := mux.Vars(r)
 	name := vars["name"]
-	isValidSession := api.authenticateSession(r)
-	if !isValidSession {
+	session := api.authenticateSession(r)
+	if session == nil {
 		sendJsonError("onServerStartRequest", w, UnauthorizedError, http.StatusUnauthorized)
 		return
 	}
@@ -212,8 +217,8 @@ func (api *ApiServer) onServerStopRequest(w http.ResponseWriter, r *http.Request
 	}
 	vars := mux.Vars(r)
 	name := vars["name"]
-	isValidSession := api.authenticateSession(r)
-	if !isValidSession {
+	session := api.authenticateSession(r)
+	if session == nil {
 		sendJsonError("onServerStopRequest", w, UnauthorizedError, http.StatusUnauthorized)
 		return
 	}
@@ -238,8 +243,8 @@ func (api *ApiServer) onServerRestartRequest(w http.ResponseWriter, r *http.Requ
 	}
 	vars := mux.Vars(r)
 	name := vars["name"]
-	isValidSession := api.authenticateSession(r)
-	if !isValidSession {
+	session := api.authenticateSession(r)
+	if session == nil {
 		sendJsonError("onServerRestartRequest", w, UnauthorizedError, http.StatusUnauthorized)
 		return
 	}
@@ -264,8 +269,8 @@ func (api *ApiServer) onServerDeleteRequest(w http.ResponseWriter, r *http.Reque
 	}
 	vars := mux.Vars(r)
 	name := vars["name"]
-	isValidSession := api.authenticateSession(r)
-	if !isValidSession {
+	session := api.authenticateSession(r)
+	if session == nil {
 		sendJsonError("onServerDeleteRequest", w, UnauthorizedError, http.StatusUnauthorized)
 		return
 	}
@@ -299,22 +304,26 @@ func (api *ApiServer) onAuthRequest(w http.ResponseWriter, r *http.Request) {
 	var email string = requestBody.Email
 	var password string = requestBody.Password
 
-	if email != ServerAdminEmail || password != ServerAdminPassword {
+	isValid, err := api.authorization.ValidateCredentials(email, password)
+	if err != nil {
+		log.Printf("onAuthRequest: error in authorization: %v", err)
+		sendJsonError("onAuthRequest", w, SessionAuthorizationFailedError, http.StatusInternalServerError)
+		return
+	}
+	if !isValid {
 		sendJsonError("onAuthRequest", w, UnauthorizedError, http.StatusUnauthorized)
 		return
 	}
 
-	token, err2 := generateAuthToken()
+	session, err2 := api.session.CreateSession(email)
 	if err2 != nil {
 		log.Printf("onAuthRequest: generating session: error: %v", err2)
 		sendJsonError("onAuthRequest", w, SessionGenerationFailedError, http.StatusInternalServerError)
 		return
 	}
 
-	api.authenticatedSessionToken = token
-
 	response := EmailTokenDTO{
-		Token:    token,
+		Token:    session.Token,
 		Email:    email,
 		Verified: true,
 	}
@@ -365,12 +374,17 @@ func (api *ApiServer) startApiServer() error {
 	return nil
 }
 
-func (api *ApiServer) authenticateSession(r *http.Request) bool {
-	if api.authenticatedSessionToken == "" {
-		return false
-	}
+func (api *ApiServer) authenticateSession(r *http.Request) *Session {
 	authorization := r.Header.Get("Authorization")
-	return authorization == "Bearer "+api.authenticatedSessionToken
+	token, err := parseBearerToken(authorization)
+	if err != nil {
+		return nil
+	}
+	session, err := api.session.ValidateSession(token)
+	if err != nil {
+		return nil
+	}
+	return session
 }
 
 func logRequest(method string, r *http.Request) {
@@ -407,4 +421,13 @@ func sendJsonData(method string, w http.ResponseWriter, response any) {
 		sendJsonError(method, w, EncodingFailedError, http.StatusInternalServerError)
 		return
 	}
+}
+
+// parseBearerToken extracts the token from a "Bearer TOKEN" string
+func parseBearerToken(bearerToken string) (string, error) {
+	parts := strings.Split(bearerToken, " ")
+	if len(parts) != 2 || strings.ToLower(parts[0]) != "bearer" {
+		return "", errors.New("parseBearerToken: invalid token format")
+	}
+	return parts[1], nil
 }

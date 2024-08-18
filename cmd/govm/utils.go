@@ -66,3 +66,13 @@ func sanitizeName(name string) string {
 	}
 	return strings.TrimSpace(cleanName)
 }
+
+// contains checks if a value exists in a slice of values
+func contains[T comparable](slice []T, item T) bool {
+	for _, s := range slice {
+		if s == item {
+			return true
+		}
+	}
+	return false
+}

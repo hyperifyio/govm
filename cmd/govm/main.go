@@ -8,14 +8,10 @@ import (
 	"log"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 
 	"govm"
 )
-
-var ServerAdminEmail string
-var ServerAdminPassword string
 
 func main() {
 
@@ -44,13 +40,15 @@ func main() {
 		return
 	}
 
+	var serverAdminEmail string
 	if *adminEmail == "" {
-		ServerAdminEmail = DefaultAdminUserEmail
+		serverAdminEmail = DefaultAdminUserEmail
 	} else {
-		ServerAdminEmail = *adminEmail
+		serverAdminEmail = *adminEmail
 	}
-	fmt.Printf("ADMIN_EMAIL=%s\n", ServerAdminEmail)
+	fmt.Printf("ADMIN_EMAIL=%s\n", serverAdminEmail)
 
+	var serverAdminPassword string
 	if *adminPassword == "" {
 		password, err := generatePassword(32)
 		if err != nil {
@@ -59,9 +57,9 @@ func main() {
 		} else {
 			fmt.Printf("ADMIN_PASSWORD=%s\n", password)
 		}
-		ServerAdminPassword = password
+		serverAdminPassword = password
 	} else {
-		ServerAdminPassword = *adminPassword
+		serverAdminPassword = *adminPassword
 	}
 
 	// Features
@@ -74,6 +72,12 @@ func main() {
 	} else {
 		enabledActions, err = ParseServerActionCodeList(featuresList)
 	}
+
+	// AuthorizationService
+	authorizationService := NewSingleMemoryAuthorizationService(serverAdminEmail, serverAdminPassword)
+
+	// SessionService
+	sessionService := NewSingleMemorySessionService()
 
 	// Service
 	var service ServerService
@@ -101,7 +105,7 @@ func main() {
 		log.Fatalf("Failed to start the service: %v", err)
 	}
 
-	server := NewApiServer(listenTo, service, enabledActions)
+	server := NewApiServer(listenTo, service, sessionService, authorizationService, enabledActions)
 
 	err = server.startApiServer()
 	if err != nil {
@@ -113,34 +117,4 @@ func main() {
 		log.Fatalf("Failed to stop the service: %v", err)
 	}
 
-}
-
-func parseIntEnv(key string, defaultValue int) int {
-	str := os.Getenv(key)
-	if str == "" {
-		return defaultValue
-	}
-	result, err := strconv.Atoi(str)
-	if err != nil {
-		return defaultValue
-	}
-	return result
-}
-
-func parseStringEnv(key string, defaultValue string) string {
-	str := os.Getenv(key)
-	if str == "" {
-		return defaultValue
-	}
-	return str
-}
-
-// contains checks if a value exists in a slice of values
-func contains[T comparable](slice []T, item T) bool {
-	for _, s := range slice {
-		if s == item {
-			return true
-		}
-	}
-	return false
 }

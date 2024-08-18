@@ -30,8 +30,8 @@ func (api *ApiServer) onVncOpen(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	isValidSession := api.authenticateSession(r)
-	if !isValidSession {
+	session := api.authenticateSession(r)
+	if session == nil {
 		sendJsonError("onVncOpen", w, UnauthorizedError, http.StatusUnauthorized)
 		return
 	}
@@ -81,8 +81,8 @@ func (api *ApiServer) onVncClose(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	isValidSession := api.authenticateSession(r)
-	if !isValidSession {
+	session := api.authenticateSession(r)
+	if session == nil {
 		log.Printf("onVncClose: Not valid session")
 		sendJsonError("onVncClose", w, UnauthorizedError, http.StatusUnauthorized)
 		return

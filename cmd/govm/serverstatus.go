@@ -64,6 +64,7 @@ func (d ServerStatusCode) GetAvailableActions(
 ) []ServerActionCode {
 	var actions []ServerActionCode
 	switch d {
+
 	case UninitializedServerStatusCode:
 		if contains(enabledActions, DeployServerActionCode) {
 			actions = append(actions, DeployServerActionCode)
@@ -72,6 +73,7 @@ func (d ServerStatusCode) GetAvailableActions(
 			actions = append(actions, DeleteServerActionCode)
 		}
 		break
+
 	case StoppedServerStatusCode:
 		if contains(enabledActions, StartServerActionCode) {
 			actions = append(actions, StartServerActionCode)
@@ -80,6 +82,7 @@ func (d ServerStatusCode) GetAvailableActions(
 			actions = append(actions, DeleteServerActionCode)
 		}
 		break
+
 	case StartedServerStatusCode:
 		if contains(enabledActions, StopServerActionCode) {
 			actions = append(actions, StopServerActionCode)
@@ -88,6 +91,7 @@ func (d ServerStatusCode) GetAvailableActions(
 			}
 		}
 		break
+
 	default:
 		break
 	}
