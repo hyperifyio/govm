@@ -28,7 +28,7 @@ func main() {
 	port := flag.Int("port", parseIntEnv("PORT", 3001), "change default port")
 	version := flag.Bool("version", false, "Show version information")
 	demo := flag.Bool("demo", false, "Use demo version of the service")
-	features := flag.String("features", "start,stop,restart", "Enable server actions. Available actions are none, all, create, deploy, start, stop, restart, delete, and console.")
+	features := flag.String("features", "start,stop,restart,console", "Enable server actions. Available actions are none, all, create, deploy, start, stop, restart, delete, and console.")
 
 	listenTo := fmt.Sprintf("%s:%d", *addr, *port)
 
