@@ -3,5 +3,6 @@
 package main
 
 const (
-	DefaultAdminUserEmail = "admin@example.com"
+	DefaultAdminUserEmail   = "admin@example.com"
+	ConfigManagerBufferSize = 100
 )

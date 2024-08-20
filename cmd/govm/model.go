@@ -7,6 +7,13 @@ import (
 	"math/rand"
 )
 
+type UserEmailList []string
+
+// contains checks if a email address exists in the email list
+func (list UserEmailList) contains(email string) bool {
+	return contains(list, email)
+}
+
 // ServerModel This is the data model of the server inside the GoVM
 type ServerModel struct {
 
@@ -18,6 +25,8 @@ type ServerModel struct {
 
 	// EnabledActions
 	EnabledActions ServerActionCodeList
+
+	Users UserEmailList
 }
 
 func NewServerModel(

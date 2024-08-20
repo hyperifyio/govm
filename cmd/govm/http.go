@@ -26,6 +26,7 @@ type ApiServer struct {
 	enabledActions             []ServerActionCode
 	permissions                ServerPermissionDTO
 	unauthenticatedPermissions ServerPermissionDTO
+	config                     *ConfigManager
 }
 
 func NewApiServer(
@@ -34,6 +35,7 @@ func NewApiServer(
 	sessionService SessionService,
 	authorization AuthorizationService,
 	enabledActions []ServerActionCode,
+	config *ConfigManager,
 ) *ApiServer {
 	return &ApiServer{
 		listen:                     listen,
@@ -44,6 +46,7 @@ func NewApiServer(
 		enabledActions:             enabledActions,
 		permissions:                NewServerPermissionDTOFromServerActionCodeList(enabledActions),
 		unauthenticatedPermissions: NewServerPermissionDTOFromServerActionCodeList(nil),
+		config:                     config,
 	}
 }
 
@@ -93,11 +96,19 @@ func (api *ApiServer) onAddServerRequest(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	config := api.config.GetConfig()
+	if config.Servers.hasByName(name) {
+		sendJsonError("onAddServerRequest", w, ServerExistsAlreadyInConfig, http.StatusConflict)
+		return
+	}
+
 	_, err = api.service.AddServer(name)
 	if err != nil {
 		logAndSendJsonError(err, "onAddServerRequest", w, InternalServerError, http.StatusInternalServerError)
 		return
 	}
+
+	api.config.AddServerConfig(name, []string{session.Email})
 
 	serverList, err := api.service.GetServerList()
 	if err != nil {
@@ -119,13 +130,23 @@ func (api *ApiServer) onServerListRequest(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	permissions := api.permissions
+
 	serverList, err := api.service.GetServerList()
 	if err != nil {
 		logAndSendJsonError(err, "onServerListRequest", w, InternalServerError, http.StatusInternalServerError)
 		return
 	}
 
-	response := ToServerListDTO(serverList, api.permissions)
+	config := api.config.GetConfig()
+
+	var result []*ServerModel
+	for _, item := range serverList {
+		if config.ServerHasAccessToEmail(item.Name, session.Email) {
+			result = append(result, item)
+		}
+	}
+	response := ToServerListDTO(result, permissions)
 	sendJsonData("onServerListRequest", w, response)
 
 }
@@ -140,6 +161,13 @@ func (api *ApiServer) onServerRequest(w http.ResponseWriter, r *http.Request) {
 	session := api.authenticateSession(r)
 	if session == nil {
 		sendJsonError("onServerListRequest", w, UnauthorizedError, http.StatusUnauthorized)
+		return
+	}
+
+	config := api.config.GetConfig()
+
+	if !config.ServerHasAccessToEmail(name, session.Email) {
+		sendJsonError("onServerListRequest", w, NotFoundError, http.StatusNotFound)
 		return
 	}
 
@@ -170,6 +198,11 @@ func (api *ApiServer) onServerDeployRequest(w http.ResponseWriter, r *http.Reque
 		sendJsonError("onServerDeployRequest", w, UnauthorizedError, http.StatusUnauthorized)
 		return
 	}
+	config := api.config.GetConfig()
+	if !config.ServerHasAccessToEmail(name, session.Email) {
+		sendJsonError("onServerDeployRequest", w, NotFoundError, http.StatusNotFound)
+		return
+	}
 	item, err := api.service.DeployServer(name)
 	if err != nil {
 		logAndSendJsonError(err, "onServerDeployRequest", w, InternalServerError, http.StatusInternalServerError)
@@ -194,6 +227,11 @@ func (api *ApiServer) onServerStartRequest(w http.ResponseWriter, r *http.Reques
 	session := api.authenticateSession(r)
 	if session == nil {
 		sendJsonError("onServerStartRequest", w, UnauthorizedError, http.StatusUnauthorized)
+		return
+	}
+	config := api.config.GetConfig()
+	if !config.ServerHasAccessToEmail(name, session.Email) {
+		sendJsonError("onServerStartRequest", w, NotFoundError, http.StatusNotFound)
 		return
 	}
 	item, err := api.service.StartServer(name)
@@ -222,6 +260,11 @@ func (api *ApiServer) onServerStopRequest(w http.ResponseWriter, r *http.Request
 		sendJsonError("onServerStopRequest", w, UnauthorizedError, http.StatusUnauthorized)
 		return
 	}
+	config := api.config.GetConfig()
+	if !config.ServerHasAccessToEmail(name, session.Email) {
+		sendJsonError("onServerStopRequest", w, NotFoundError, http.StatusNotFound)
+		return
+	}
 	item, err := api.service.StopServer(name)
 	if err != nil {
 		logAndSendJsonError(err, "onServerStopRequest", w, InternalServerError, http.StatusInternalServerError)
@@ -248,6 +291,11 @@ func (api *ApiServer) onServerRestartRequest(w http.ResponseWriter, r *http.Requ
 		sendJsonError("onServerRestartRequest", w, UnauthorizedError, http.StatusUnauthorized)
 		return
 	}
+	config := api.config.GetConfig()
+	if !config.ServerHasAccessToEmail(name, session.Email) {
+		sendJsonError("onServerRestartRequest", w, NotFoundError, http.StatusNotFound)
+		return
+	}
 	item, err := api.service.RestartServer(name)
 	if err != nil {
 		logAndSendJsonError(err, "onServerRestartRequest", w, InternalServerError, http.StatusInternalServerError)
@@ -272,6 +320,11 @@ func (api *ApiServer) onServerDeleteRequest(w http.ResponseWriter, r *http.Reque
 	session := api.authenticateSession(r)
 	if session == nil {
 		sendJsonError("onServerDeleteRequest", w, UnauthorizedError, http.StatusUnauthorized)
+		return
+	}
+	config := api.config.GetConfig()
+	if !config.ServerHasAccessToEmail(name, session.Email) {
+		sendJsonError("onServerDeleteRequest", w, NotFoundError, http.StatusNotFound)
 		return
 	}
 	item, err := api.service.DeleteServer(name)

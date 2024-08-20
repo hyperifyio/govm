@@ -20,6 +20,7 @@ const (
 	VncGenerateTokenError           = "vnc-generate-token-error"
 	VncOpenError                    = "vnc-open-error"
 	BadBodyError                    = "bad-body"
+	ServerExistsAlreadyInConfig     = "server-exists-already-in-config"
 	LimitParseError                 = "limit-parse-failed"
 	TypeParseError                  = "type-parse-failed"
 )

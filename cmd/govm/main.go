@@ -28,7 +28,8 @@ func main() {
 	port := flag.Int("port", parseIntEnv("PORT", 3001), "change default port")
 	version := flag.Bool("version", false, "Show version information")
 	demo := flag.Bool("demo", false, "Use demo version of the service")
-	features := flag.String("features", "start,stop,restart,console", "Enable server actions. Available actions are none, all, create, deploy, start, stop, restart, delete, and console.")
+	features := flag.String("features", parseStringEnv("GOVM_FEATURES", "start,stop,restart,console"), "Enable server actions. Available actions are none, all, create, deploy, start, stop, restart, delete, and console.")
+	configFile := flag.String("config", parseStringEnv("GOVM_CONFIG", "./config.yml"), "Configuration file")
 
 	listenTo := fmt.Sprintf("%s:%d", *addr, *port)
 
@@ -62,8 +63,16 @@ func main() {
 		serverAdminPassword = *adminPassword
 	}
 
-	// Features
 	var err any
+
+	// Config
+	config, err := LoadConfig(*configFile)
+	if err != nil {
+		log.Fatalf("Failed to read config file: %s: %v", *configFile, err)
+	}
+	configManager := NewConfigManager(*configFile, config)
+
+	// Features
 	var enabledActions []ServerActionCode
 	featuresList := strings.Split(*features, ",")
 	if contains(featuresList, "none") {
@@ -105,7 +114,7 @@ func main() {
 		log.Fatalf("Failed to start the service: %v", err)
 	}
 
-	server := NewApiServer(listenTo, service, sessionService, authorizationService, enabledActions)
+	server := NewApiServer(listenTo, service, sessionService, authorizationService, enabledActions, configManager)
 
 	err = server.startApiServer()
 	if err != nil {

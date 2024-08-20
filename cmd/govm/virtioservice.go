@@ -35,6 +35,7 @@ type VirtioService struct {
 	restartEnabled bool
 	deleteEnabled  bool
 	consoleEnabled bool
+	config         *Config
 }
 
 // NewVirtioService -- Initiate the service
@@ -317,7 +318,7 @@ func (s *VirtioService) GetServerList() ([]*ServerModel, error) {
 		defer item.Free()
 		model, err := getServerModel(&item, s.enabledActions)
 		if err != nil {
-			return nil, fmt.Errorf("AddServer: failed to get domain data: %v", err)
+			return nil, fmt.Errorf("GetServerList: failed to get domain data: %v", err)
 		}
 		servers = append(servers, model)
 	}
