@@ -10,6 +10,7 @@ const (
 	SessionGenerationFailedError    = "session-generation-failed"
 	SessionAuthorizationFailedError = "session-authorization-failed"
 	NotFoundError                   = "not-found"
+	IllegalNameError                = "illegal-name-error"
 	InternalServerError             = "internal-server-error"
 	InvalidMethod                   = "invalid-method"
 	UpgradeError                    = "upgrade-error"

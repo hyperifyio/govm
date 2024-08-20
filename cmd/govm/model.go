@@ -82,3 +82,26 @@ func ToStatusStringList(
 	}
 	return ret
 }
+
+// ValidateName validates a string based on the provided rules
+func ValidateName(s string) bool {
+	if len(s) < 1 || len(s) > 32 {
+		return false
+	}
+	for i, c := range s {
+		if i == 0 {
+			if !(c >= 'a' && c <= 'z') {
+				return false
+			}
+		} else if i == len(s)-1 {
+			if !((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9')) {
+				return false
+			}
+		} else {
+			if !((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '_' || c == '-') {
+				return false
+			}
+		}
+	}
+	return true
+}

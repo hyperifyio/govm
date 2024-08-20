@@ -91,8 +91,8 @@ func (api *ApiServer) onAddServerRequest(w http.ResponseWriter, r *http.Request)
 	}
 
 	var name string = *requestBody.Name
-	if name == "" {
-		sendJsonError("onAddServerRequest", w, BadBodyError, http.StatusBadRequest)
+	if !ValidateName(name) {
+		sendJsonError("onAddServerRequest", w, IllegalNameError, http.StatusBadRequest)
 		return
 	}
 
@@ -157,6 +157,10 @@ func (api *ApiServer) onServerRequest(w http.ResponseWriter, r *http.Request) {
 
 	vars := mux.Vars(r)
 	name := vars["name"]
+	if !ValidateName(name) {
+		sendJsonError("onServerListRequest", w, NotFoundError, http.StatusNotFound)
+		return
+	}
 
 	session := api.authenticateSession(r)
 	if session == nil {
@@ -193,6 +197,11 @@ func (api *ApiServer) onServerDeployRequest(w http.ResponseWriter, r *http.Reque
 	}
 	vars := mux.Vars(r)
 	name := vars["name"]
+	if !ValidateName(name) {
+		sendJsonError("onServerDeployRequest", w, NotFoundError, http.StatusNotFound)
+		return
+	}
+
 	session := api.authenticateSession(r)
 	if session == nil {
 		sendJsonError("onServerDeployRequest", w, UnauthorizedError, http.StatusUnauthorized)
@@ -224,6 +233,10 @@ func (api *ApiServer) onServerStartRequest(w http.ResponseWriter, r *http.Reques
 	}
 	vars := mux.Vars(r)
 	name := vars["name"]
+	if !ValidateName(name) {
+		sendJsonError("onServerStartRequest", w, NotFoundError, http.StatusNotFound)
+		return
+	}
 	session := api.authenticateSession(r)
 	if session == nil {
 		sendJsonError("onServerStartRequest", w, UnauthorizedError, http.StatusUnauthorized)
@@ -255,6 +268,10 @@ func (api *ApiServer) onServerStopRequest(w http.ResponseWriter, r *http.Request
 	}
 	vars := mux.Vars(r)
 	name := vars["name"]
+	if !ValidateName(name) {
+		sendJsonError("onServerStopRequest", w, NotFoundError, http.StatusNotFound)
+		return
+	}
 	session := api.authenticateSession(r)
 	if session == nil {
 		sendJsonError("onServerStopRequest", w, UnauthorizedError, http.StatusUnauthorized)
@@ -286,6 +303,10 @@ func (api *ApiServer) onServerRestartRequest(w http.ResponseWriter, r *http.Requ
 	}
 	vars := mux.Vars(r)
 	name := vars["name"]
+	if !ValidateName(name) {
+		sendJsonError("onServerRestartRequest", w, NotFoundError, http.StatusNotFound)
+		return
+	}
 	session := api.authenticateSession(r)
 	if session == nil {
 		sendJsonError("onServerRestartRequest", w, UnauthorizedError, http.StatusUnauthorized)
@@ -317,6 +338,10 @@ func (api *ApiServer) onServerDeleteRequest(w http.ResponseWriter, r *http.Reque
 	}
 	vars := mux.Vars(r)
 	name := vars["name"]
+	if !ValidateName(name) {
+		sendJsonError("onServerDeleteRequest", w, NotFoundError, http.StatusNotFound)
+		return
+	}
 	session := api.authenticateSession(r)
 	if session == nil {
 		sendJsonError("onServerDeleteRequest", w, UnauthorizedError, http.StatusUnauthorized)
