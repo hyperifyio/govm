@@ -12,6 +12,13 @@ type ErrorDTO struct {
 	Code int `json:"code,omitempty"`
 }
 
+// LogoutDTO struct defines the structure of the logout response
+type LogoutDTO struct {
+
+	// OK is true
+	OK bool `json:"ok"`
+}
+
 // AuthenticateEmailDTO struct defines the structure of the body to authenticate a session
 type AuthenticateEmailDTO struct {
 

@@ -419,6 +419,21 @@ func (api *ApiServer) onAuthRequest(w http.ResponseWriter, r *http.Request) {
 
 }
 
+func (api *ApiServer) onAuthLogoutRequest(w http.ResponseWriter, r *http.Request) {
+	logRequest("onAuthLogoutRequest", r)
+	session := api.authenticateSession(r)
+	if session == nil {
+		sendJsonError("onAuthLogoutRequest", w, UnauthorizedError, http.StatusUnauthorized)
+		return
+	}
+	err := api.session.DeleteSession(session)
+	if err != nil {
+		log.Print("Warning! Failed to remove session: %w", err)
+	}
+	response := LogoutDTO{OK: true}
+	sendJsonData("onAuthLogoutRequest", w, response)
+}
+
 func (api *ApiServer) startApiServer() error {
 
 	api.r = mux.NewRouter()
@@ -445,6 +460,7 @@ func (api *ApiServer) startApiServer() error {
 
 	api.r.HandleFunc("/api/v1", api.onIndexRequest).Methods("GET")
 	api.r.HandleFunc("/api/v1/auth", api.onAuthRequest).Methods("GET", "POST")
+	api.r.HandleFunc("/api/v1/auth/logout", api.onAuthLogoutRequest).Methods("GET", "POST", "DELETE")
 	api.r.HandleFunc("/api/v1/servers", api.onServerListRequest).Methods("GET")
 	api.r.HandleFunc("/api/v1/servers", api.onAddServerRequest).Methods("POST")
 	api.r.HandleFunc("/api/v1/servers/{name}", api.onServerRequest).Methods("GET")

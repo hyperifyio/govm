@@ -40,3 +40,15 @@ func (s *SingleMemorySessionService) ValidateSession(token string) (*Session, er
 	}
 	return NewSession(token, s.authenticatedSessionEmail), nil
 }
+
+func (s *SingleMemorySessionService) DeleteSession(session *Session) error {
+	if s.authenticatedSessionToken == "" {
+		return errors.New("no session")
+	}
+	if s.authenticatedSessionToken != session.Token {
+		return errors.New("invalid session")
+	}
+	s.authenticatedSessionToken = ""
+	s.authenticatedSessionEmail = ""
+	return nil
+}

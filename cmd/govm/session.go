@@ -18,4 +18,7 @@ type SessionService interface {
 
 	// ValidateSession validates a token and returns the session if it is valid, otherwise nil
 	ValidateSession(token string) (*Session, error)
+
+	// DeleteSession invalidates the session, otherwise an error
+	DeleteSession(session *Session) error
 }
