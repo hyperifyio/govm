@@ -430,6 +430,12 @@ func (api *ApiServer) startApiServer() error {
 		fileServerHandler.ServeHTTP(w, r)
 	})
 
+	frontendAppHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		logRequest("frontendAppHandler", r)
+		r.URL.Path = "index.html"
+		fileServerHandler.ServeHTTP(w, r)
+	})
+
 	// Wrap the file server onr to track requests using Prometheus
 	novncFileServerHandler := http.FileServer(http.FS(frontend.BuildNoVNC))
 	novncWrappedFileServerHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -452,6 +458,11 @@ func (api *ApiServer) startApiServer() error {
 	api.r.HandleFunc("/api/vnc/{token}", api.onVncWebSocket)
 	api.r.Handle("/metrics", promhttp.Handler())
 	api.r.PathPrefix("/api/novnc/").Handler(http.StripPrefix("/api/novnc/", novncWrappedFileServerHandler))
+
+	// Catch-all routes for frontend client-side routing
+	api.r.PathPrefix("/login").Handler(http.StripPrefix("/", frontendAppHandler))
+	api.r.PathPrefix("/main").Handler(http.StripPrefix("/", frontendAppHandler))
+
 	api.r.PathPrefix("/").Handler(http.StripPrefix("/", wrappedFileServerHandler))
 
 	if api.tlsEnabled {

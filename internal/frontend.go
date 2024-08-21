@@ -8,7 +8,7 @@ import (
 	"log"
 )
 
-//go:embed frontend-govm/build
+//go:embed frontend-govm/build frontend-govm/build/static/css frontend-govm/build/static/js frontend-govm/build/static/media
 var webContent embed.FS
 var BuildFrontend fs.FS
 
