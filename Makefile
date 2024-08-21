@@ -1,8 +1,8 @@
-.PHONY: build run clean tidy
+.PHONY: build run clean tidy certs
 
 GOVM_SOURCES := $(shell find ./*.go ./cmd ./internal -type f -iname '*.go' ! -iname '*_test.go')
 
-all: build
+all: build certs
 
 tidy:
 	go mod tidy
@@ -14,6 +14,9 @@ govm: $(GOVM_SOURCES) Makefile
 
 test: Makefile
 	go test -v ./...
+
+certs:
+	make -C certs
 
 clean:
 	rm -f ./govm

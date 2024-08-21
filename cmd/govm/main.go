@@ -30,6 +30,10 @@ func main() {
 	demo := flag.Bool("demo", false, "Use demo version of the service")
 	features := flag.String("features", parseStringEnv("GOVM_FEATURES", "start,stop,restart,console"), "Enable server actions. Available actions are none, all, create, deploy, start, stop, restart, delete, and console.")
 	configFile := flag.String("config", parseStringEnv("GOVM_CONFIG", "./config.yml"), "Configuration file")
+	https := flag.Bool("https", parseBooleanEnv("GOVM_HTTPS", false), "Enable HTTPS instead of HTTP")
+	certDir := flag.String("cert-dir", parseStringEnv("GOVM_CERT_DIR", "./certs"), "TLS files for HTTPS")
+	certFile := flag.String("cert", parseStringEnv("GOVM_CERT_FILE", "./server.crt"), "Certificate file for HTTPS")
+	keyFile := flag.String("key", parseStringEnv("GOVM_KEY_FILE", "./server.key"), "Key file for HTTPS")
 
 	listenTo := fmt.Sprintf("%s:%d", *addr, *port)
 
@@ -114,7 +118,17 @@ func main() {
 		log.Fatalf("Failed to start the service: %v", err)
 	}
 
-	server := NewApiServer(listenTo, service, sessionService, authorizationService, enabledActions, configManager)
+	tlsEnabled := *https
+	tlsDir := *certDir
+	tlsCertFile := filepath.Join(tlsDir, *certFile)
+	tlsKeyFile := filepath.Join(tlsDir, *keyFile)
+	if tlsEnabled {
+		log.Printf("Using HTTPS with certificate file (%s) and key file (%s)", tlsCertFile, tlsKeyFile)
+	} else {
+		log.Printf("Warning! Using unsecured HTTP")
+	}
+
+	server := NewApiServer(listenTo, tlsEnabled, tlsCertFile, tlsKeyFile, service, sessionService, authorizationService, enabledActions, configManager)
 
 	err = server.startApiServer()
 	if err != nil {

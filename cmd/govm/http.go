@@ -19,6 +19,9 @@ import (
 type ApiServer struct {
 	r                          *mux.Router
 	listen                     string
+	tlsEnabled                 bool
+	tlsKeyFile                 string
+	tlsCertFile                string
 	authorization              AuthorizationService
 	session                    SessionService
 	service                    ServerService
@@ -31,6 +34,9 @@ type ApiServer struct {
 
 func NewApiServer(
 	listen string,
+	tlsEnabled bool,
+	tlsCertFile string,
+	tlsKeyFile string,
 	service ServerService,
 	sessionService SessionService,
 	authorization AuthorizationService,
@@ -39,6 +45,9 @@ func NewApiServer(
 ) *ApiServer {
 	return &ApiServer{
 		listen:                     listen,
+		tlsEnabled:                 tlsEnabled,
+		tlsCertFile:                tlsCertFile,
+		tlsKeyFile:                 tlsKeyFile,
 		session:                    sessionService,
 		service:                    service,
 		authorization:              authorization,
@@ -445,9 +454,16 @@ func (api *ApiServer) startApiServer() error {
 	api.r.PathPrefix("/api/novnc/").Handler(http.StripPrefix("/api/novnc/", novncWrappedFileServerHandler))
 	api.r.PathPrefix("/").Handler(http.StripPrefix("/", wrappedFileServerHandler))
 
-	err := http.ListenAndServe(api.listen, api.r)
-	if err != nil {
-		return fmt.Errorf("failed to start http server: %v", err)
+	if api.tlsEnabled {
+		err := http.ListenAndServeTLS(api.listen, api.tlsCertFile, api.tlsKeyFile, api.r)
+		if err != nil {
+			return fmt.Errorf("startApiServer: failed to start https server: %v", err)
+		}
+	} else {
+		err := http.ListenAndServe(api.listen, api.r)
+		if err != nil {
+			return fmt.Errorf("startApiServer: failed to start http server: %v", err)
+		}
 	}
 	return nil
 }
