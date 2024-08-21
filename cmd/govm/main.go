@@ -90,7 +90,7 @@ func main() {
 	authorizationService := NewSingleMemoryAuthorizationService(serverAdminEmail, serverAdminPassword)
 
 	// SessionService
-	sessionService := NewSingleMemorySessionService()
+	sessionService := NewMemorySessionService()
 
 	// Service
 	var service ServerService
