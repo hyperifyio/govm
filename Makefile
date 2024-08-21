@@ -1,4 +1,4 @@
-.PHONY: build run clean tidy certs config
+.PHONY: build run clean tidy certs config update update-frontend
 
 GOVM_SOURCES := $(shell find ./*.go ./cmd ./internal -type f -iname '*.go' ! -iname '*_test.go')
 
@@ -19,6 +19,11 @@ govm: $(GOVM_SOURCES) Makefile config
 
 test: Makefile
 	go test -v ./...
+
+update: update-frontend
+
+update-frontend:
+	cd internal/frontend-govm/ && git pull
 
 certs:
 	make -C certs
