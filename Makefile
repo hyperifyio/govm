@@ -1,15 +1,20 @@
-.PHONY: build run clean tidy certs
+.PHONY: build run clean tidy certs config
 
 GOVM_SOURCES := $(shell find ./*.go ./cmd ./internal -type f -iname '*.go' ! -iname '*_test.go')
 
-all: build certs
+all: build config
 
 tidy:
 	go mod tidy
 
 build: govm
 
-govm: $(GOVM_SOURCES) Makefile
+config: config.yml certs
+
+config.yml:
+	@echo "servers: []" > $@
+
+govm: $(GOVM_SOURCES) Makefile config
 	CGO_ENABLED=1 GOOS=$(GOOS) GOARCH=$(GOARCH) go build -o govm ./cmd/govm
 
 test: Makefile
