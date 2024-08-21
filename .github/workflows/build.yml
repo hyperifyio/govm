@@ -91,11 +91,9 @@ jobs:
     - name: Prepare Artifacts
       run: |
         mkdir govm-${{ env.TAG_NAME }}-${{ matrix.os }}-${{ matrix.arch }}
-        mkdir govm-${{ env.TAG_NAME }}-${{ matrix.os }}-${{ matrix.arch }}/database
         CGO_ENABLED=0 GOOS=${{ matrix.os }} GOARCH=${{ matrix.arch }} goselfshield --private-key ${{ secrets.RELEASE_PRIVATE_KEY }} -source govm -output govm-${{ env.TAG_NAME }}-${{ matrix.os }}-${{ matrix.arch }}/govm
         cp README.release.md govm-${{ env.TAG_NAME }}-${{ matrix.os }}-${{ matrix.arch }}/README
         cp LICENSE.md govm-${{ env.TAG_NAME }}-${{ matrix.os }}-${{ matrix.arch }}/LICENSE
-        cp database/*.sql govm-${{ env.TAG_NAME }}-${{ matrix.os }}-${{ matrix.arch }}/database
         cp -r etc govm-${{ env.TAG_NAME }}-${{ matrix.os }}-${{ matrix.arch }}/etc/
         zip -r govm-${{ env.TAG_NAME }}-${{ matrix.os }}-${{ matrix.arch }}.zip govm-${{ env.TAG_NAME }}-${{ matrix.os }}-${{ matrix.arch }}
 
@@ -136,11 +134,11 @@ jobs:
         draft: false
         prerelease: false
         body: |
-          Notice! This release contains the game server release as an encrypted self-installer executable. You will need a private key to use it. Please contact us if you are interested to host your own game server.
+          Notice! This release contains the release as an encrypted self-installer executable. You will need a private key to use it, which we'll provide after purchase.
 
           This release is provided under **Functional Source License, Version 1.1, MIT Future License**. 
 
-          For other commercial license options before **${{ env.MIT_DATE }}**, please contact sales at [sales@hg.fi](mailto:sales@hg.fi) or visit our [website](https://www.heusalagroup.com).
+          For other commercial license options before **${{ env.MIT_DATE }}**, please contact us at [info@sendanor.fi](mailto:info@sendanor.fi) or visit our [website](https://www.sendanor.fi).
 
           Please refer to [the full license text](https://github.com/hyperifyio/project-govm/blob/main/LICENSE.md) for detailed terms and conditions.
 
@@ -184,11 +182,11 @@ jobs:
         draft: false
         prerelease: false
         body: |
-          Notice! This release contains the game server release as an encrypted self-installer executable. You will need a private key to use it. Please contact us if you are interested to host your own game server.
+          Notice! This release contains the release as an encrypted self-installer executable. You will need a private key to use it, which we'll provide after purchase.
 
           This release is provided under **Functional Source License, Version 1.1, MIT Future License**.
 
-          For other commercial license options before **${{ env.MIT_DATE }}**, please contact sales at [sales@hg.fi](mailto:sales@hg.fi) or visit our [website](https://www.heusalagroup.com).
+          For other commercial license options before **${{ env.MIT_DATE }}**, please contact us at [info@sendanor.fi](mailto:info@sendanor.fi) or visit our [website](https://www.sendanor.fi).
 
           Please refer to [the full license text](https://github.com/hyperifyio/project-govm/blob/main/LICENSE.md) for detailed terms and conditions.
 
