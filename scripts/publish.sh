@@ -3,10 +3,10 @@ set -e
 set -x
 
 (
-	cd internal/frontend/project-govm
+	cd internal/frontend-govm/
 	git pull
 )
-git add internal/frontend/project-govm
+git add internal/frontend-govm/
 
 CURRENT_BRANCH=$(git branch --show-current)
 
@@ -15,7 +15,7 @@ VERSION=$(echo 0.0.$(( $(git tag|grep -E '^v0\.0\.'|sed -re 's/^v0\.0\.//'|sort 
 export BUILD_VERSION=$VERSION
 
 (
-	cd internal/frontend/project-govm
+	cd internal/frontend-govm/
 	git tag -a "v$VERSION" -m "Version $VERSION"
 	git push origin "v$VERSION"
 	git push
@@ -36,4 +36,4 @@ git push
 git checkout "$CURRENT_BRANCH"
 
 set +x
-printf -- "READY!\n\nSee https://github.com/hangovergames/govm/releases\n"
+printf -- "READY!\n\nSee https://github.com/hyperifyio/govm/releases\n"
