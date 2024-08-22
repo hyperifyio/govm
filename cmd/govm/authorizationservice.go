@@ -1,4 +1,4 @@
-// Copyright (c) 2024. Hangover Games <info@hangover.games>. All rights reserved.
+// Copyright (c) 2024. Sendanor <info@sendanor.fi>. All rights reserved.
 
 package main
 
