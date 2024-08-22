@@ -112,3 +112,13 @@ Content-Length: 436
 {
 }
 ```
+
+### DevOps
+
+Our devops pipelines use following secrets:
+
+`RELEASE_PAT` is a GitHub Personal Access Token.
+See [Managing your personal access tokens](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens).
+
+`RELEASE_PRIVATE_KEY` is a private random passphrase which is used to encrypt 
+releases using [goselfshield](https://github.com/hyperifyio/goselfshield).
